@@ -1,0 +1,42 @@
+name: 🔄 Sync Cron - Magazord → GHL
+on:
+  schedule:
+    # Executa a cada 15 minutos
+    - cron: '*/15 * * * *'
+  
+  # Permite execução manual pelo dashboard do GitHub
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    name: Executar Sincronização
+    
+    steps:
+      - name: 🚀 Trigger Supabase Edge Function
+        run: |
+          echo "🔄 Iniciando sincronização via Supabase Edge Function..."
+          
+          response=$(curl -s -w "\n%{http_code}" \
+            -X GET 'https://gyxjuxmwnwyansfoabyv.supabase.co/functions/v1/sync-cron' \
+            -H 'Content-Type: application/json')
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "📊 Status HTTP: $http_code"
+          echo "📦 Resposta: $body"
+          
+          if [ $http_code -ge 200 ] && [ $http_code -lt 300 ]; then
+            echo "✅ Sincronização executada com sucesso!"
+          else
+            echo "❌ Erro na sincronização!"
+            exit 1
+          fi
+      
+      - name: 📝 Log de execução
+        if: always()
+        run: |
+          echo "⏰ Executado em: $(date)"
+          echo "🔗 Projeto: neese"
+          echo "🎯 Supabase Project: gyxjuxmwnwyansfoabyv"

@@ -4,12 +4,29 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const VERCEL_API_URL = Deno.env.get('VERCEL_API_URL') || 'https://seu-app.vercel.app'
+const CRON_SECRET = Deno.env.get('CRON_SECRET') || ''
 
 serve(async (req) => {
   try {
     console.log('🚀 Iniciando sincronização automática via Supabase...')
     
-    // Registra início da execução no Supabase
+    // Validação simples de segurança (opcional)
+    const authHeader = req.headers.get('Authorization')
+    const cronSecretHeader = req.headers.get('X-Cron-Secret')
+    
+    // Permite chamadas públicas ou com secret válido
+    const isAuthorized = !CRON_SECRET || 
+                        cronSecretHeader === CRON_SECRET ||
+                        authHeader?.includes('Bearer')
+    
+    if (!isAuthorized) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' }}
+      )
+    }
+    
+    // Registra início da execução
     const inicio = new Date()
     
     // Chama o endpoint do Vercel
@@ -18,8 +35,7 @@ serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Supabase-Cron/1.0',
-        // Adiciona autenticação se necessário
-        'X-Cron-Secret': Deno.env.get('CRON_SECRET') || '',
+        'X-Cron-Secret': CRON_SECRET,
       },
     })
 
