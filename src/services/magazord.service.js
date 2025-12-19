@@ -16,10 +16,17 @@ class MagazordService {
   /**
    * Busca carrinhos - API v2 Magazord
    * Endpoint: GET /v2/site/carrinho
+   * Requer parâmetro dataAtualizacaoInicio
    */
   async buscarCarrinhos(status = null) {
     try {
-      const params = {};
+      // Data de 24 horas atrás
+      const dataInicio = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('.')[0];
+      
+      const params = {
+        dataAtualizacaoInicio: dataInicio
+      };
+      
       if (status) {
         params.status = status;
       }
