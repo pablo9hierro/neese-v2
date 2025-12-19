@@ -3,34 +3,22 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const VERCEL_API_URL = Deno.env.get('VERCEL_API_URL') || 'https://seu-app.vercel.app'
+const VERCEL_API_URL = Deno.env.get('VERCEL_API_URL') || 'https://neese-23vy.vercel.app'
 const CRON_SECRET = Deno.env.get('CRON_SECRET') || ''
 
 serve(async (req) => {
   try {
     console.log('🚀 Iniciando sincronização automática via Supabase...')
-    
-    // Validação simples de segurança (opcional)
-    const authHeader = req.headers.get('Authorization')
-    const cronSecretHeader = req.headers.get('X-Cron-Secret')
-    
-    // Permite chamadas públicas ou com secret válido
-    const isAuthorized = !CRON_SECRET || 
-                        cronSecretHeader === CRON_SECRET ||
-                        authHeader?.includes('Bearer')
-    
-    if (!isAuthorized) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' }}
-      )
-    }
+    console.log('📍 VERCEL_API_URL:', VERCEL_API_URL)
     
     // Registra início da execução
     const inicio = new Date()
     
     // Chama o endpoint do Vercel
-    const response = await fetch(`${VERCEL_API_URL}/api/cron`, {
+    const vercelUrl = `${VERCEL_API_URL}/api/cron`
+    console.log('📞 Chamando:', vercelUrl)
+    
+    const response = await fetch(vercelUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -39,9 +27,15 @@ serve(async (req) => {
       },
     })
 
-    const resultado = await response.json()
     const fim = new Date()
     const duracao = fim.getTime() - inicio.getTime()
+    
+    let resultado
+    try {
+      resultado = await response.json()
+    } catch (e) {
+      resultado = { error: 'Resposta não é JSON', text: await response.text() }
+    }
 
     console.log('✅ Sincronização concluída:', {
       status: response.status,
@@ -51,14 +45,18 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: response.ok,
         status: response.status,
         duracao_ms: duracao,
         timestamp: fim.toISOString(),
+        vercel_url: vercelUrl,
         resultado
       }),
       { 
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
         status: 200 
       }
     )
@@ -70,11 +68,15 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        vercel_url: VERCEL_API_URL
       }),
       { 
-        headers: { 'Content-Type': 'application/json' },
-        status: 500 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        status: 200  // Retorna 200 mesmo com erro para não quebrar os crons
       }
     )
   }
