@@ -30,7 +30,7 @@ Sistema de integração automática entre **Magazord** e **GoHighLevel** para au
 
 ## 🔄 Sincronização Automática
 
-- **Frequência**: A cada **20 minutos** (via Vercel Cron)
+- **Frequência**: A cada **15 minutos** (via Vercel Cron)
 - **Busca ativa** na API Magazord por novos eventos
 - **Evita duplicatas** com sistema de cache inteligente
 - **Processa em lote** para otimizar performance
@@ -164,7 +164,7 @@ No painel da Vercel, vá em **Settings > Environment Variables** e adicione:
 ```
 GET /api/cron
 ```
-- Executado automaticamente a cada 20 minutos pelo Vercel Cron
+- Executado automaticamente a cada 15 minutos pelo Vercel Cron
 - Busca novos eventos no Magazord
 - Envia para GHL
 

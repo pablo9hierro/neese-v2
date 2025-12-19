@@ -66,7 +66,7 @@ if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`\n🚀 Servidor rodando na porta ${PORT}`);
     console.log(`📡 Acesse: http://localhost:${PORT}`);
-    console.log(`⏰ Sincronização configurada para rodar a cada ${config.sync.intervalMinutes} minutos\n`);
+    console.log(`⏰ Sincronização configurada para rodar a cada 15 minutos\n`);
   });
 }
 
