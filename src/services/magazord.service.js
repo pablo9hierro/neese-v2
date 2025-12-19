@@ -14,17 +14,22 @@ class MagazordService {
   }
 
   /**
-   * Busca carrinhos com diferentes status
-   * Status: 1=Aberto, 2=Checkout/Aguardando, 3=Convertido, 4=Abandonado
+   * Busca carrinhos - API v2 Magazord
+   * Endpoint: GET /v2/site/carrinho
    */
   async buscarCarrinhos(status = null) {
     try {
-      const params = status ? { status } : {};
-      const response = await axios.get(`${this.apiUrl}/carrinhos`, {
+      const params = {};
+      if (status) {
+        params.status = status;
+      }
+      
+      const response = await axios.get(`${this.apiUrl}/v2/site/carrinho`, {
         auth: this.auth,
         params
       });
-      return response.data;
+      
+      return response.data?.data || response.data || [];
     } catch (error) {
       console.error('Erro ao buscar carrinhos:', error.response?.data || error.message);
       throw error;
@@ -33,34 +38,47 @@ class MagazordService {
 
   /**
    * Busca carrinho específico por ID
+   * Endpoint: GET /v2/site/carrinho/{carrinho}
    */
   async buscarCarrinhoPorId(carrinhoId) {
     try {
-      const response = await axios.get(`${this.apiUrl}/carrinhos/${carrinhoId}`, {
+      const response = await axios.get(`${this.apiUrl}/v2/site/carrinho/${carrinhoId}`, {
         auth: this.auth
       });
-      return response.data;
+      return response.data?.data || response.data;
     } catch (error) {
       console.error(`Erro ao buscar carrinho ${carrinhoId}:`, error.response?.data || error.message);
       throw error;
     }
   }
+  
+  /**
+   * Busca itens de um carrinho específico
+   * Endpoint: GET /v2/site/carrinho/{carrinho}/itens
+   */
+  async buscarItensCarrinho(carrinhoId) {
+    try {
+      const response = await axios.get(`${this.apiUrl}/v2/site/carrinho/${carrinhoId}/itens`, {
+        auth: this.auth
+      });
+      return response.data?.data || response.data || [];
+    } catch (error) {
+      console.error(`Erro ao buscar itens do carrinho ${carrinhoId}:`, error.response?.data || error.message);
+      return [];
+    }
+  }
 
   /**
-   * Busca pedidos
-   * Status: 1=Pendente, 2=Em processamento, 3=Enviado, 4=Aprovado, 5=Cancelado, 6=Aguardando Pagamento
+   * Busca pedidos - API v2 Magazord
+   * Endpoint: GET /v2/site/pedido
    */
   async buscarPedidos(params = {}) {
     try {
-      const response = await axios.get(`${this.apiUrl}/pedidos`, {
+      const response = await axios.get(`${this.apiUrl}/v2/site/pedido`, {
         auth: this.auth,
-        params: {
-          ...params,
-          // Buscar apenas últimos 24 horas para otimizar
-          data_inicio: params.data_inicio || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-        }
+        params
       });
-      return response.data;
+      return response.data?.data || response.data || [];
     } catch (error) {
       console.error('Erro ao buscar pedidos:', error.response?.data || error.message);
       throw error;
@@ -68,14 +86,15 @@ class MagazordService {
   }
 
   /**
-   * Busca pedido específico por ID
+   * Busca pedido específico por código
+   * Endpoint: GET /v2/site/pedido/{codigoPedido}
    */
   async buscarPedidoPorId(pedidoId) {
     try {
-      const response = await axios.get(`${this.apiUrl}/pedidos/${pedidoId}`, {
+      const response = await axios.get(`${this.apiUrl}/v2/site/pedido/${pedidoId}`, {
         auth: this.auth
       });
-      return response.data;
+      return response.data?.data || response.data;
     } catch (error) {
       console.error(`Erro ao buscar pedido ${pedidoId}:`, error.response?.data || error.message);
       throw error;
@@ -84,13 +103,14 @@ class MagazordService {
 
   /**
    * Busca informações de rastreamento do pedido
+   * Endpoint: GET /v2/site/pedido/{codigoPedido}/rastreio
    */
   async buscarRastreamento(pedidoId) {
     try {
-      const response = await axios.get(`${this.apiUrl}/pedidos/${pedidoId}/rastreamento`, {
+      const response = await axios.get(`${this.apiUrl}/v2/site/pedido/${pedidoId}/rastreio`, {
         auth: this.auth
       });
-      return response.data;
+      return response.data?.data || response.data;
     } catch (error) {
       console.error(`Erro ao buscar rastreamento do pedido ${pedidoId}:`, error.response?.data || error.message);
       // Retorna objeto vazio se não houver rastreamento
@@ -99,17 +119,18 @@ class MagazordService {
   }
 
   /**
-   * Busca cliente por ID
+   * Busca pessoa (cliente) por ID
+   * Endpoint: GET /v2/site/pessoa/{pessoaId}
    */
   async buscarCliente(clienteId) {
     try {
-      const response = await axios.get(`${this.apiUrl}/clientes/${clienteId}`, {
+      const response = await axios.get(`${this.apiUrl}/v2/site/pessoa/${clienteId}`, {
         auth: this.auth
       });
-      return response.data;
+      return response.data?.data || response.data;
     } catch (error) {
       console.error(`Erro ao buscar cliente ${clienteId}:`, error.response?.data || error.message);
-      throw error;
+      return null;
     }
   }
 }
