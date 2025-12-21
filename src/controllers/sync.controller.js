@@ -63,27 +63,47 @@ async function processarCarrinhos(dataInicio, dataFim) {
         continue;
       }
 
+      // Buscar dados completos do carrinho (com cliente se disponível)
+      let carrinhoCompleto = carrinho;
+      let cliente = null;
+      
+      try {
+        // Tenta buscar detalhes do carrinho
+        const detalhes = await magazordService.buscarCarrinhoPorId(carrinho.id);
+        if (detalhes) {
+          carrinhoCompleto = { ...carrinho, ...detalhes };
+          
+          // Se tem pessoa_id, busca dados da pessoa
+          if (detalhes.pessoa_id) {
+            cliente = await magazordService.buscarPessoa(detalhes.pessoa_id);
+          }
+        }
+      } catch (error) {
+        // Se falhar, usa dados básicos do carrinho
+        console.log(`   ⚠️ Dados completos não disponíveis para carrinho ${carrinho.id}`);
+      }
+
       // Processar de acordo com o status
       // Status: 1=Aberto, 2=Checkout/Aguardando, 3=Convertido, 4=Abandonado
       let evento = null;
       
       if (carrinho.status === 1) {
         // Carrinho aberto
-        evento = transformerService.transformarCarrinhoAberto(carrinho, null);
+        evento = transformerService.transformarCarrinhoAberto(carrinhoCompleto, cliente);
       } else if (carrinho.status === 2) {
         // Carrinho em checkout
-        evento = transformerService.transformarCarrinhoCheckout(carrinho, null);
+        evento = transformerService.transformarCarrinhoCheckout(carrinhoCompleto, cliente);
       } else if (carrinho.status === 3 && carrinho.pedido) {
         // Carrinho convertido - buscar pedido
         try {
           const pedido = await magazordService.buscarPedidoPorId(carrinho.pedido.id);
-          evento = transformerService.transformarPedido(pedido, carrinho);
+          evento = transformerService.transformarPedido(pedido, carrinhoCompleto);
         } catch (error) {
           console.error(`Erro ao buscar pedido ${carrinho.pedido.id}:`, error.message);
         }
       } else if (carrinho.status === 4) {
         // Carrinho abandonado
-        evento = transformerService.transformarCarrinhoAbandonado(carrinho, null);
+        evento = transformerService.transformarCarrinhoAbandonado(carrinhoCompleto, cliente);
       }
       
       if (evento) {
