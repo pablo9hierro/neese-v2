@@ -16,30 +16,50 @@ class MagazordService {
   /**
    * Busca carrinhos - API v2 Magazord
    * Endpoint: GET /v2/site/carrinho
-   * Requer parâmetro dataAtualizacaoInicio
+   * Requer parâmetros dataAtualizacaoInicio e dataAtualizacaoFim
+   * 
+   * @param {Date} dataInicio - Data inicial para busca (padrão: 1 hora atrás)
+   * @param {Date} dataFim - Data final para busca (padrão: agora)
    */
-  async buscarCarrinhos(status = null) {
+  async buscarCarrinhos(dataInicio = null, dataFim = null, status = null) {
     try {
-      // Data de 24 horas atrás
-      const dataInicio = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('.')[0];
+      // Se não informado, busca desde 1 hora atrás até agora
+      if (!dataInicio) {
+        dataInicio = new Date(Date.now() - 60 * 60 * 1000); // 1 hora atrás
+      }
+      if (!dataFim) {
+        dataFim = new Date();
+      }
+      
+      // Formatar datas no padrão ISO sem milissegundos
+      const dataInicioFormatada = dataInicio.toISOString().split('.')[0];
+      const dataFimFormatada = dataFim.toISOString().split('.')[0];
       
       const params = {
-        dataAtualizacaoInicio: dataInicio
+        dataAtualizacaoInicio: dataInicioFormatada,
+        dataAtualizacaoFim: dataFimFormatada,
+        limit: 100
       };
       
       if (status) {
         params.status = status;
       }
       
+      console.log(`📅 Buscando carrinhos de ${dataInicioFormatada} até ${dataFimFormatada}`);
+      
       const response = await axios.get(`${this.apiUrl}/v2/site/carrinho`, {
         auth: this.auth,
         params
       });
       
-      return response.data?.data || response.data || [];
+      // A resposta vem em data.items
+      const carrinhos = response.data?.data?.items || response.data?.items || [];
+      console.log(`🛒 Encontrados ${carrinhos.length} carrinhos`);
+      
+      return carrinhos;
     } catch (error) {
       console.error('Erro ao buscar carrinhos:', error.response?.data || error.message);
-      throw error;
+      return [];
     }
   }
 
@@ -78,17 +98,41 @@ class MagazordService {
   /**
    * Busca pedidos - API v2 Magazord
    * Endpoint: GET /v2/site/pedido
+   * 
+   * @param {Date} dataInicio - Data inicial para filtro incremental (padrão: 1 hora atrás)
+   * @param {Date} dataFim - Data final para filtro incremental (padrão: agora)
    */
-  async buscarPedidos(params = {}) {
+  async buscarPedidos(dataInicio = null, dataFim = null) {
     try {
+      // Define datas padrão se não fornecidas
+      if (!dataInicio) {
+        dataInicio = new Date(Date.now() - 60 * 60 * 1000); // 1 hora atrás
+      }
+      if (!dataFim) {
+        dataFim = new Date();
+      }
+
+      // Formata datas para API (sem milissegundos)
+      const dataInicioStr = dataInicio.toISOString().split('.')[0];
+      const dataFimStr = dataFim.toISOString().split('.')[0];
+
+      console.log(`[Magazord] Buscando pedidos de ${dataInicioStr} até ${dataFimStr}`);
+
       const response = await axios.get(`${this.apiUrl}/v2/site/pedido`, {
         auth: this.auth,
-        params
+        params: {
+          dataAtualizacaoInicio: dataInicioStr,
+          dataAtualizacaoFim: dataFimStr
+        }
       });
-      return response.data?.data || response.data || [];
+
+      const pedidos = response.data?.data?.items || [];
+      console.log(`[Magazord] Encontrados ${pedidos.length} pedidos`);
+      
+      return pedidos;
     } catch (error) {
       console.error('Erro ao buscar pedidos:', error.response?.data || error.message);
-      throw error;
+      return [];
     }
   }
 
