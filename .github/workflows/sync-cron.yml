@@ -18,7 +18,7 @@ jobs:
           echo "🔄 Iniciando sincronização via Vercel..."
           
           response=$(curl -s -w "\n%{http_code}" \
-            -X GET 'https://neese-23vy.vercel.app/api/cron' \
+            -X GET 'https://neese-v2-beige.vercel.app/api/cron' \
             -H 'Content-Type: application/json')
           
           http_code=$(echo "$response" | tail -n1)
@@ -39,4 +39,4 @@ jobs:
         run: |
           echo "⏰ Executado em: $(date)"
           echo "🔗 Projeto: neese"
-          echo "🎯 Vercel: neese-23vy.vercel.app"
+          echo "🎯 Vercel: neese-v2-beige.vercel.app"
