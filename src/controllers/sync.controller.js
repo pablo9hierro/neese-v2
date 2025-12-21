@@ -63,24 +63,34 @@ async function processarCarrinhos(dataInicio, dataFim) {
         continue;
       }
 
-      // Buscar dados completos do carrinho (com cliente se disponível)
-      let carrinhoCompleto = carrinho;
+      // Buscar dados completos separadamente
+      let carrinhoCompleto = { ...carrinho };
       let cliente = null;
+      let itens = [];
       
       try {
-        // Tenta buscar detalhes do carrinho
-        const detalhes = await magazordService.buscarCarrinhoPorId(carrinho.id);
-        if (detalhes) {
-          carrinhoCompleto = { ...carrinho, ...detalhes };
+        // 1. Buscar detalhes completos do carrinho
+        console.log(`   🔍 Buscando detalhes do carrinho ${carrinho.id}...`);
+        const detalhesCarrinho = await magazordService.buscarCarrinhoPorId(carrinho.id);
+        
+        if (detalhesCarrinho) {
+          carrinhoCompleto = { ...carrinho, ...detalhesCarrinho };
           
-          // Se tem pessoa_id, busca dados da pessoa
-          if (detalhes.pessoa_id) {
-            cliente = await magazordService.buscarPessoa(detalhes.pessoa_id);
+          // 2. Se tem pessoa_id, buscar dados da pessoa
+          if (detalhesCarrinho.pessoa_id || detalhesCarrinho.pessoaId) {
+            const pessoaId = detalhesCarrinho.pessoa_id || detalhesCarrinho.pessoaId;
+            console.log(`   👤 Buscando pessoa ${pessoaId}...`);
+            cliente = await magazordService.buscarPessoa(pessoaId);
           }
         }
+        
+        // 3. Buscar itens do carrinho
+        console.log(`   📦 Buscando itens do carrinho ${carrinho.id}...`);
+        itens = await magazordService.buscarItensCarrinho(carrinho.id);
+        carrinhoCompleto.itens = itens;
+        
       } catch (error) {
-        // Se falhar, usa dados básicos do carrinho
-        console.log(`   ⚠️ Dados completos não disponíveis para carrinho ${carrinho.id}`);
+        console.log(`   ⚠️ Erro ao buscar dados completos do carrinho ${carrinho.id}:`, error.message);
       }
 
       // Processar de acordo com o status

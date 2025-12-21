@@ -173,16 +173,23 @@ class MagazordService {
    * Busca pessoa (cliente) por ID
    * Endpoint: GET /v2/site/pessoa/{pessoaId}
    */
-  async buscarCliente(clienteId) {
+  async buscarPessoa(pessoaId) {
     try {
-      const response = await axios.get(`${this.apiUrl}/v2/site/pessoa/${clienteId}`, {
+      const response = await axios.get(`${this.apiUrl}/v2/site/pessoa/${pessoaId}`, {
         auth: this.auth
       });
       return response.data?.data || response.data;
     } catch (error) {
-      console.error(`Erro ao buscar cliente ${clienteId}:`, error.response?.data || error.message);
+      console.error(`Erro ao buscar pessoa ${pessoaId}:`, error.response?.data || error.message);
       return null;
     }
+  }
+
+  /**
+   * Busca cliente - alias para buscarPessoa
+   */
+  async buscarCliente(clienteId) {
+    return this.buscarPessoa(clienteId);
   }
 }
 
