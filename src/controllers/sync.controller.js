@@ -232,9 +232,9 @@ export async function executarSincronizacao() {
   let resultados = [];
 
   try {
-    // 1. Usa janela de 10 minutos (cron roda a cada 5 min)
+    // 1. Usa janela de 12 horas (cron roda a cada 5 min)
     dataFim = new Date();
-    dataInicio = new Date(dataFim.getTime() - 10 * 60 * 1000); // 10 minutos atrás
+    dataInicio = new Date(dataFim.getTime() - 12 * 60 * 60 * 1000); // 12 horas atrás
     
     console.log(`\n📊 PERÍODO DE SINCRONIZAÇÃO:`);
     console.log(`   De: ${dataInicio.toISOString()} (${dataInicio.toLocaleString('pt-BR')})`);
