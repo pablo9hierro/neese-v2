@@ -242,11 +242,9 @@ export async function executarSincronizacao() {
   let resultados = [];
 
   try {
-    // 1. Sistema incremental inteligente:
-    // - PRIMEIRA VEZ: busca últimas 12h de histórico
-    // - PRÓXIMAS: busca apenas desde última execução (5-10 min)
-    dataInicio = await supabaseService.obterUltimaExecucao();
-    dataFim = new Date();
+    // BUSCAR APENAS DIA 21/12/2025
+    dataInicio = new Date('2025-12-21T00:00:00-03:00');
+    dataFim = new Date('2025-12-21T23:59:59-03:00');
     
     console.log(`\n📊 PERÍODO DE SINCRONIZAÇÃO:`);
     console.log(`   De: ${dataInicio.toISOString()} (${dataInicio.toLocaleString('pt-BR')})`);
@@ -254,11 +252,7 @@ export async function executarSincronizacao() {
     
     const diferencaMinutos = Math.floor((dataFim - dataInicio) / (1000 * 60));
     console.log(`   ⏱️  Janela: ${diferencaMinutos} minutos`);
-    if (diferencaMinutos > 60) {
-      console.log(`   🔄 Primeira execução ou gap longo - buscando histórico`);
-    } else {
-      console.log(`   ✅ Execução incremental - apenas dados novos`);
-    }    
+    console.log(`   🔄 Buscando dados do dia 21/12/2025`);    
     // 2. Limpa cache se necessário
     limparCache();
 
