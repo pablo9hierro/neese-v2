@@ -126,7 +126,9 @@ class MagazordService {
       const dataInicioStr = dataInicioBrasilia.toISOString().split('.')[0];
       const dataFimStr = dataFimBrasilia.toISOString().split('.')[0];
 
-      console.log(`[Magazord] Buscando pedidos de ${dataInicioStr} até ${dataFimStr}`);
+      console.error(`[Magazord] 🔍 Buscando pedidos:`);
+      console.error(`   De: ${dataInicioStr}`);
+      console.error(`   Até: ${dataFimStr}`);
 
       const response = await axios.get(`${this.apiUrl}/v2/site/pedido`, {
         auth: this.auth,
@@ -136,8 +138,15 @@ class MagazordService {
         }
       });
 
+      console.error(`[Magazord] 📡 Response status: ${response.status}`);
+      console.error(`[Magazord] 📦 Response data keys:`, Object.keys(response.data || {}));
+      
       const pedidos = response.data?.data?.items || [];
-      console.log(`[Magazord] Encontrados ${pedidos.length} pedidos`);
+      console.error(`[Magazord] ✅ Encontrados ${pedidos.length} pedidos`);
+      
+      if (pedidos.length > 0) {
+        console.error(`[Magazord] 📋 Primeiro pedido:`, JSON.stringify(pedidos[0], null, 2));
+      }
       
       return pedidos;
     } catch (error) {
