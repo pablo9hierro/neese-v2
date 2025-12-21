@@ -178,6 +178,7 @@ export async function executarSincronizacao() {
   const inicio = Date.now();
   let totalEventos = 0;
   let dataInicio, dataFim;
+  let resultados = [];
 
   try {
     // 1. Busca última execução do Supabase
@@ -210,7 +211,7 @@ export async function executarSincronizacao() {
       console.log('\n📤 ENVIANDO PARA GHL...');
 
       // Envia todos os eventos para o GHL
-      const resultados = await ghlService.enviarLote(todosEventos);
+      resultados = await ghlService.enviarLote(todosEventos);
 
       const sucessos = resultados.filter(r => r.success).length;
       const falhas = resultados.filter(r => !r.success).length;
@@ -234,11 +235,12 @@ export async function executarSincronizacao() {
     
     // 5. Registra log da sincronização
     const duracaoMs = Date.now() - inicio;
+    const eventosEnviados = totalEventos > 0 ? resultados.filter(r => r?.success).length : 0;
     await supabaseService.registrarLog(
       'cron_auto',
       totalEventos,
       totalEventos,
-      todosEventos.filter((_, i) => resultados[i]?.success).length,
+      eventosEnviados,
       duracaoMs
     );
 
