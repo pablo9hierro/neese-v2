@@ -6,9 +6,9 @@ export default async function handler(req, res) {
   console.log('\n🧪 TESTE - BUSCA DIA 20/12/2025');
   
   try {
-    // Busca apenas do dia 20/12/2025
-    const dataInicio = new Date('2025-12-20T00:00:00-03:00');
-    const dataFim = new Date('2025-12-20T23:59:59-03:00');
+    // Busca apenas do dia 21/12/2025
+    const dataInicio = new Date('2025-12-21T00:00:00-03:00');
+    const dataFim = new Date('2025-12-21T23:59:59-03:00');
     
     console.log(`📅 De: ${dataInicio.toISOString()}`);
     console.log(`📅 Até: ${dataFim.toISOString()}`);
