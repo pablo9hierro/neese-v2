@@ -63,63 +63,35 @@ async function processarCarrinhos(dataInicio, dataFim) {
         continue;
       }
 
-      // Buscar dados completos separadamente
+      // SKIP: Carrinho convertido será processado como pedido
+      if (carrinho.status === 3) {
+        continue;
+      }
+
+      // SKIP: Carrinhos abertos (status 1) e abandonados (status 4) raramente têm dados de contato
+      // Apenas processar checkout (status 2) que tem mais chance de ter pessoa
+      if (carrinho.status === 1 || carrinho.status === 4) {
+        console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status ${carrinho.status}) - sem garantia de contato`);
+        continue;
+      }
+
       let carrinhoCompleto = { ...carrinho };
       let cliente = null;
       let itens = [];
-      let pessoaId = null;
       
       try {
-        // 1. Se carrinho tem pedido associado, buscar o pedido para pegar pessoaId
-        if (carrinho.pedido && carrinho.pedido.id) {
-          console.log(`   🔍 Carrinho ${carrinho.id} tem pedido ${carrinho.pedido.id} - buscando dados...`);
-          const pedidoId = carrinho.pedido.id;
-          
-          // Buscar pedido na lista para pegar pessoaId
-          const dataInicio = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 dias atrás
-          const dataFim = new Date();
-          const pedidos = await magazordService.buscarPedidos(dataInicio, dataFim);
-          const pedidoEncontrado = pedidos.find(p => p.id === pedidoId);
-          
-          if (pedidoEncontrado && pedidoEncontrado.pessoaId) {
-            pessoaId = pedidoEncontrado.pessoaId;
-            console.log(`   👤 Pessoa ID encontrada: ${pessoaId}`);
-            
-            // Buscar dados completos da pessoa
-            cliente = await magazordService.buscarPessoa(pessoaId);
-            
-            // Adicionar dados do pedido ao carrinho
-            carrinhoCompleto.pessoaNome = pedidoEncontrado.pessoaNome;
-            carrinhoCompleto.pessoaContato = pedidoEncontrado.pessoaContato;
-            carrinhoCompleto.valorTotal = pedidoEncontrado.valorTotal;
-          }
-        }
-        
-        // 2. Buscar itens do carrinho
-        console.log(`   📦 Buscando itens do carrinho ${carrinho.id}...`);
+        // Buscar itens do carrinho
         itens = await magazordService.buscarItensCarrinho(carrinho.id);
         carrinhoCompleto.itens = itens;
         
       } catch (error) {
-        console.log(`   ⚠️ Erro ao buscar dados completos do carrinho ${carrinho.id}:`, error.message);
+        console.log(`   ⚠️ Erro ao buscar itens do carrinho ${carrinho.id}:`, error.message);
       }
 
-      // Processar de acordo com o status
-      // Status: 1=Aberto, 2=Checkout/Aguardando, 3=Convertido, 4=Abandonado
+      // Processar apenas checkout (status 2)
       let evento = null;
-      
-      if (carrinho.status === 1) {
-        // Carrinho aberto
-        evento = transformerService.transformarCarrinhoAberto(carrinhoCompleto, cliente);
-      } else if (carrinho.status === 2) {
-        // Carrinho em checkout
+      if (carrinho.status === 2) {
         evento = transformerService.transformarCarrinhoCheckout(carrinhoCompleto, cliente);
-      } else if (carrinho.status === 3 && carrinho.pedido) {
-        // Carrinho convertido - processar como pedido
-        continue; // Será processado na função de pedidos
-      } else if (carrinho.status === 4) {
-        // Carrinho abandonado
-        evento = transformerService.transformarCarrinhoAbandonado(carrinhoCompleto, cliente);
       }
       
       if (evento) {
