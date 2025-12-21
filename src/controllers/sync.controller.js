@@ -232,22 +232,19 @@ export async function executarSincronizacao() {
     // 2. Limpa cache se necessário
     limparCache();
 
-    // 3. Processa carrinhos e pedidos de forma incremental
-    const [eventosCarrinhos, eventosPedidos] = await Promise.all([
-      processarCarrinhos(dataInicio, dataFim),
-      processarPedidos(dataInicio, dataFim)
-    ]);
+    // 3. Processa APENAS PEDIDOS (dados de pessoa garantidos)
+    console.log('\n📦 Processando pedidos...');
+    const eventosPedidos = await processarPedidos(dataInicio, dataFim);
 
     // Junta todos os eventos
-    const todosEventos = [...eventosCarrinhos, ...eventosPedidos];
+    const todosEventos = [...eventosPedidos];
     totalEventos = todosEventos.length;
 
     if (totalEventos === 0) {
       console.log('\n✅ NENHUM EVENTO NOVO - Sistema atualizado!');
     } else {
       console.log(`\n📊 RESUMO: ${totalEventos} eventos novos encontrados`);
-      console.log(`   🛒 Carrinhos: ${eventosCarrinhos.length}`);
-      console.log(`   📦 Pedidos: ${eventosPedidos.length}`);
+      console.log(`    Pedidos: ${eventosPedidos.length}`);
       console.log('\n📤 ENVIANDO PARA GHL...');
 
       // Envia todos os eventos para o GHL
