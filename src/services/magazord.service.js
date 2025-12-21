@@ -31,9 +31,14 @@ class MagazordService {
         dataFim = new Date();
       }
       
-      // Formatar datas no padrão ISO sem milissegundos
-      const dataInicioFormatada = dataInicio.toISOString().split('.')[0];
-      const dataFimFormatada = dataFim.toISOString().split('.')[0];
+      // Converter para horário de Brasília (UTC-3)
+      const offsetBrasilia = -3 * 60; // -3 horas em minutos
+      const dataInicioBrasilia = new Date(dataInicio.getTime() + (offsetBrasilia * 60 * 1000));
+      const dataFimBrasilia = new Date(dataFim.getTime() + (offsetBrasilia * 60 * 1000));
+      
+      // Formatar datas no padrão ISO sem milissegundos e sem Z (horário local)
+      const dataInicioFormatada = dataInicioBrasilia.toISOString().split('.')[0];
+      const dataFimFormatada = dataFimBrasilia.toISOString().split('.')[0];
       
       const params = {
         dataAtualizacaoInicio: dataInicioFormatada,
@@ -45,7 +50,7 @@ class MagazordService {
         params.status = status;
       }
       
-      console.log(`📅 Buscando carrinhos de ${dataInicioFormatada} até ${dataFimFormatada}`);
+      console.log(`[Magazord] Buscando carrinhos de ${dataInicioFormatada} até ${dataFimFormatada}`);
       
       const response = await axios.get(`${this.apiUrl}/v2/site/carrinho`, {
         auth: this.auth,
@@ -112,9 +117,14 @@ class MagazordService {
         dataFim = new Date();
       }
 
-      // Formata datas para API (sem milissegundos)
-      const dataInicioStr = dataInicio.toISOString().split('.')[0];
-      const dataFimStr = dataFim.toISOString().split('.')[0];
+      // Converter para horário de Brasília (UTC-3)
+      const offsetBrasilia = -3 * 60; // -3 horas em minutos
+      const dataInicioBrasilia = new Date(dataInicio.getTime() + (offsetBrasilia * 60 * 1000));
+      const dataFimBrasilia = new Date(dataFim.getTime() + (offsetBrasilia * 60 * 1000));
+      
+      // Formatar datas no padrão ISO sem milissegundos e sem Z
+      const dataInicioStr = dataInicioBrasilia.toISOString().split('.')[0];
+      const dataFimStr = dataFimBrasilia.toISOString().split('.')[0];
 
       console.log(`[Magazord] Buscando pedidos de ${dataInicioStr} até ${dataFimStr}`);
 
