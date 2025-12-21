@@ -128,6 +128,8 @@ async function processarCarrinhos(dataInicio, dataFim) {
           eventos.push(evento);
           marcarProcessado(identificador);
         }
+      } else {
+        console.log(`   ⚠️  Carrinho ${carrinho.id} rejeitado (sem dados obrigatórios)`);
       }
     }
     
@@ -173,6 +175,11 @@ async function processarPedidos(dataInicio, dataFim) {
       }
 
       const evento = transformerService.transformarPedido(pedido, null, rastreamento);
+      
+      if (!evento) {
+        console.log(`   ⚠️  Pedido ${pedido.id} rejeitado (sem dados obrigatórios)`);
+        continue;
+      }
       
       // Tenta registrar no Supabase (evita duplicatas)
       const isNovo = await supabaseService.registrarEvento(

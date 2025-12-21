@@ -1,35 +1,66 @@
 /**
  * Serviço para transformar dados do Magazord para o formato GHL
+ * REGRAS:
+ * - Email OU Telefone são OBRIGATÓRIOS (preferencialmente os dois)
+ * - Dados completos dependem do status
+ * - Entrega só quando aplicável (pedidos aprovados com rastreio)
  */
 class TransformerService {
   
   /**
+   * Valida se tem dados de contato mínimos (email OU telefone)
+   */
+  validarDadosContato(cliente) {
+    const temEmail = cliente?.email && cliente.email.trim() !== '';
+    const temTelefone = cliente?.telefone && cliente.telefone.trim() !== '';
+    
+    return temEmail || temTelefone;
+  }
+
+  /**
+   * Extrai dados de pessoa do carrinho ou cliente
+   */
+  extrairDadosPessoa(carrinho, cliente) {
+    // Prioriza dados do cliente, depois do carrinho
+    const email = cliente?.email || carrinho?.email || carrinho?.cliente_email || '';
+    const telefone = cliente?.telefone || carrinho?.telefone || carrinho?.cliente_telefone || '';
+    const nome = cliente?.nome || carrinho?.nome || carrinho?.cliente_nome || 'Cliente não identificado';
+    
+    return {
+      nome: nome.trim(),
+      email: email.trim(),
+      telefone: telefone.trim()
+    };
+  }
+
+  /**
    * Transforma carrinho aberto para formato GHL
+   * Status 1 - Carrinho Aberto
+   * Dados obrigatórios: pessoa (email/telefone), itens, valor_total
    */
   transformarCarrinhoAberto(carrinho, cliente) {
+    const pessoa = this.extrairDadosPessoa(carrinho, cliente);
+    
+    // VALIDAÇÃO OBRIGATÓRIA: Não envia se não tiver contato
+    if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
+      console.log(`⚠️  Carrinho ${carrinho.id} sem dados de contato - IGNORADO`);
+      return null;
+    }
+
     return {
       tipo_evento: 'carrinho_aberto',
       carrinho_id: carrinho.id,
       status: {
         codigo: 1,
-        descricao: 'Aberto',
-        data_atualizacao: carrinho.data_atualizacao || new Date().toISOString()
+        descricao: 'Carrinho Aberto',
+        data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
       },
-      pessoa: {
-        nome: cliente?.nome || 'Cliente não identificado',
-        email: cliente?.email || '',
-        telefone: cliente?.telefone || ''
-      },
+      pessoa,
       carrinho: {
         carrinho_id: carrinho.id,
         status: 'aberto',
         status_codigo: 1,
-        origem: carrinho.origem || 1,
-        utm_source: carrinho.utm_source || '',
-        utm_params: carrinho.utm_params || {},
-        ip: carrinho.ip || '',
-        user_agent: carrinho.user_agent || '',
-        valor_total: carrinho.valor_total || '0.00',
+        valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
         itens: this.transformarItens(carrinho.itens || [])
       },
       origem: {
@@ -41,227 +72,193 @@ class TransformerService {
   }
 
   /**
+   * Transforma carrinho abandonado
+   * Status 4 - Carrinho Abandonado
+   * Dados obrigatórios: pessoa (email/telefone), itens, valor_total
+   */
+  transformarCarrinhoAbandonado(carrinho, cliente) {
+    const pessoa = this.extrairDadosPessoa(carrinho, cliente);
+    
+    if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
+      console.log(`⚠️  Carrinho abandonado ${carrinho.id} sem dados de contato - IGNORADO`);
+      return null;
+    }
+
+    return {
+      tipo_evento: 'carrinho_abandonado',
+      carrinho_id: carrinho.id,
+      status: {
+        codigo: 4,
+        descricao: 'Carrinho Abandonado',
+        data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
+      },
+      pessoa,
+      carrinho: {
+        carrinho_id: carrinho.id,
+        status: 'abandonado',
+        status_codigo: 4,
+        valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
+        itens: this.transformarItens(carrinho.itens || [])
+      },
+      origem: {
+        fonte: 'magazord',
+        capturado_em: new Date().toISOString(),
+        identificador_unico: `CART-ABANDONED-${carrinho.id}-${Date.now()}`
+      }
+    };
+  }
+
+  /**
    * Transforma carrinho em checkout (aguardando pagamento)
+   * Status 2 - Aguardando Pagamento
+   * Dados obrigatórios: pessoa, itens, valor_total, forma_pagamento
    */
   transformarCarrinhoCheckout(carrinho, cliente) {
+    const pessoa = this.extrairDadosPessoa(carrinho, cliente);
+    
+    if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
+      console.log(`⚠️  Carrinho checkout ${carrinho.id} sem dados de contato - IGNORADO`);
+      return null;
+    }
+
     return {
       tipo_evento: 'carrinho_checkout',
       carrinho_id: carrinho.id,
       status: {
         codigo: 2,
         descricao: 'Aguardando Pagamento',
-        data_atualizacao: carrinho.data_atualizacao || new Date().toISOString()
+        data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
       },
-      pessoa: {
-        nome: cliente?.nome || 'Cliente não identificado',
-        email: cliente?.email || '',
-        telefone: cliente?.telefone || ''
-      },
+      pessoa,
       carrinho: {
         carrinho_id: carrinho.id,
         status: 'checkout',
         status_codigo: 2,
-        origem: carrinho.origem || 1,
-        utm_source: carrinho.utm_source || '',
-        utm_params: carrinho.utm_params || {},
-        ip: carrinho.ip || '',
-        user_agent: carrinho.user_agent || '',
-        valor_total: carrinho.valor_total || '0.00',
-        forma_pagamento: carrinho.forma_pagamento || 'Não informado',
-        link_pagamento: carrinho.link_pagamento || null,
+        valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
+        forma_pagamento: carrinho.forma_pagamento || carrinho.formaPagamento || 'Não informado',
         itens: this.transformarItens(carrinho.itens || [])
       },
       origem: {
         fonte: 'magazord',
         capturado_em: new Date().toISOString(),
-        identificador_unico: `CHECKOUT-${carrinho.id}-${Date.now()}`
+        identificador_unico: `CART-CHECKOUT-${carrinho.id}-${Date.now()}`
       }
     };
   }
 
   /**
-   * Transforma carrinho abandonado para formato GHL
+   * Transforma pedido completo
+   * Dados obrigatórios: pessoa, pedido completo
+   * Dados condicionais: entrega (só quando tem rastreio)
    */
-  transformarCarrinhoAbandonado(carrinho, cliente) {
-    return {
-      tipo_evento: 'carrinho_abandonado',
-      carrinho_id: carrinho.id,
-      status: {
-        codigo: 4,
-        descricao: 'Abandonado',
-        data_atualizacao: carrinho.data_atualizacao || new Date().toISOString()
-      },
-      pessoa: {
-        nome: cliente?.nome || 'Cliente não identificado',
-        email: cliente?.email || '',
-        telefone: cliente?.telefone || ''
-      },
-      carrinho: {
-        carrinho_id: carrinho.id,
-        status: 'abandonado',
-        status_codigo: 4,
-        origem: carrinho.origem || 1,
-        utm_source: carrinho.utm_source || '',
-        utm_params: carrinho.utm_params || {},
-        ip: carrinho.ip || '',
-        user_agent: carrinho.user_agent || '',
-        valor_total: carrinho.valor_total || '0.00',
-        forma_pagamento: carrinho.forma_pagamento || 'Não informado',
-        link_checkout: this.gerarLinkCheckout(carrinho),
-        itens: this.transformarItens(carrinho.itens || [])
-      },
-      origem: {
-        fonte: 'magazord',
-        capturado_em: new Date().toISOString(),
-        identificador_unico: `ABANDONED-${carrinho.id}-${Date.now()}`
-      }
-    };
-  }
+  transformarPedido(pedido, carrinho = null, rastreamento = null) {
+    // Extrai pessoa do pedido ou carrinho
+    const pessoa = this.extrairDadosPessoa(pedido, null);
+    
+    if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
+      console.log(`⚠️  Pedido ${pedido.id} sem dados de contato - IGNORADO`);
+      return null;
+    }
 
-  /**
-   * Transforma pedido criado/aprovado para formato GHL
-   */
-  transformarPedidoCriado(pedido, cliente, rastreamento = null) {
-    return {
-      tipo_evento: 'pedido_criado',
+    const statusDescricao = this.getStatusDescricao(pedido.status);
+    const temRastreio = rastreamento && (rastreamento.codigo || rastreamento.codigoRastreio);
+
+    const evento = {
+      tipo_evento: 'status_atualizado',
       pedido_id: pedido.id,
       pedido_codigo: pedido.codigo || `PEDIDO-${pedido.id}`,
       status: {
-        codigo: pedido.status || 4,
-        descricao: this.getStatusDescricao(pedido.status),
-        data_atualizacao: pedido.data_atualizacao || new Date().toISOString()
+        codigo: pedido.status || 0,
+        descricao: statusDescricao,
+        data_atualizacao: pedido.dataAtualizacao || pedido.data_atualizacao || new Date().toISOString()
       },
-      pessoa: {
-        nome: cliente?.nome || pedido.cliente_nome || 'Cliente não identificado',
-        email: cliente?.email || pedido.cliente_email || '',
-        telefone: cliente?.telefone || pedido.cliente_telefone || ''
-      },
+      pessoa,
       pedido: {
-        data_pedido: pedido.data_pedido || new Date().toISOString(),
-        valor_total: pedido.valor_total || '0.00',
-        forma_pagamento: pedido.forma_pagamento || 'Não informado',
-        link_pagamento: pedido.link_pagamento || null,
-        status: this.getStatusDescricao(pedido.status),
-        status_codigo: pedido.status || 4,
+        data_pedido: pedido.dataPedido || pedido.data_pedido || new Date().toISOString(),
+        valor_total: pedido.valorTotal || pedido.valor_total || '0.00',
+        forma_pagamento: pedido.formaPagamento || pedido.forma_pagamento || 'Não informado',
+        link_pagamento: pedido.linkPagamento || pedido.link_pagamento || null,
         itens: this.transformarItens(pedido.itens || [])
       },
-      carrinho: {
-        carrinho_id: pedido.carrinho_id || null,
-        status: 'convertido',
-        status_codigo: 3,
-        origem: pedido.origem || 1,
-        utm_source: pedido.utm_source || '',
-        utm_params: pedido.utm_params || {},
-        ip: pedido.ip || '',
-        user_agent: pedido.user_agent || ''
-      },
-      entrega: this.transformarEntrega(pedido, rastreamento),
       origem: {
         fonte: 'magazord',
         capturado_em: new Date().toISOString(),
-        identificador_unico: `ORDER-${pedido.id}-${Date.now()}`
+        identificador_unico: `MGZ-PEDIDO-${pedido.id}`
       }
     };
-  }
 
-  /**
-   * Transforma atualização de status de pedido
-   */
-  transformarStatusPedido(pedido, cliente, rastreamento = null) {
-    return {
-      tipo_evento: 'pedido_status_atualizado',
-      pedido_id: pedido.id,
-      pedido_codigo: pedido.codigo || `PEDIDO-${pedido.id}`,
-      status: {
-        codigo: pedido.status,
-        descricao: this.getStatusDescricao(pedido.status),
-        data_atualizacao: pedido.data_atualizacao || new Date().toISOString()
-      },
-      pessoa: {
-        nome: cliente?.nome || pedido.cliente_nome || 'Cliente não identificado',
-        email: cliente?.email || pedido.cliente_email || '',
-        telefone: cliente?.telefone || pedido.cliente_telefone || ''
-      },
-      pedido: {
-        data_pedido: pedido.data_pedido || new Date().toISOString(),
-        valor_total: pedido.valor_total || '0.00',
-        forma_pagamento: pedido.forma_pagamento || 'Não informado',
-        status: this.getStatusDescricao(pedido.status),
-        status_codigo: pedido.status,
-        itens: this.transformarItens(pedido.itens || [])
-      },
-      entrega: this.transformarEntrega(pedido, rastreamento),
-      origem: {
-        fonte: 'magazord',
-        capturado_em: new Date().toISOString(),
-        identificador_unico: `STATUS-${pedido.id}-${Date.now()}`
-      }
-    };
+    // Adiciona dados de entrega APENAS se tiver rastreio
+    if (temRastreio) {
+      evento.entrega = {
+        status: 'rastreavel',
+        codigo_rastreio: rastreamento.codigoRastreio || rastreamento.codigo || '',
+        transportadora: rastreamento.transportadora || '',
+        link_rastreio: rastreamento.linkRastreio || rastreamento.link || '',
+        previsao_entrega: rastreamento.previsaoEntrega || '',
+        data_postagem: rastreamento.dataPostagem || '',
+        endereco_entrega: pedido.enderecoEntrega || null,
+        eventos: rastreamento.eventos || []
+      };
+    } else {
+      // Sem rastreio - apenas indica que não está disponível ainda
+      evento.entrega = {
+        status: 'aguardando',
+        codigo_rastreio: '',
+        transportadora: '',
+        link_rastreio: '',
+        previsao_entrega: '',
+        data_postagem: '',
+        endereco_entrega: null,
+        eventos: []
+      };
+    }
+
+    return evento;
   }
 
   /**
    * Transforma itens do carrinho/pedido
    */
   transformarItens(itens) {
+    if (!Array.isArray(itens)) return [];
+    
     return itens.map(item => ({
-      produto_id: item.produto_id || item.id,
-      descricao: item.nome || item.descricao || 'Produto sem descrição',
-      quantidade: item.quantidade || 1,
-      valor_unitario: item.valor_unitario || item.preco || '0.00',
-      valor_total: item.valor_total || (parseFloat(item.preco || 0) * (item.quantidade || 1)).toFixed(2)
+      produto_id: item.produto_id || item.produtoId || item.id,
+      descricao: item.descricao || item.nome || 'Produto',
+      quantidade: item.quantidade || item.qtd || 1,
+      valor_unitario: item.valor_unitario || item.valorUnitario || item.preco || '0.00',
+      valor_total: item.valor_total || item.valorTotal || '0.00'
     }));
-  }
-
-  /**
-   * Transforma informações de entrega
-   */
-  transformarEntrega(pedido, rastreamento) {
-    const entregaBase = {
-      status: rastreamento ? 'rastreavel' : 'pendente',
-      codigo_rastreio: rastreamento?.codigo_rastreio || '',
-      transportadora: rastreamento?.transportadora || pedido.transportadora || '',
-      link_rastreio: rastreamento?.link_rastreio || '',
-      previsao_entrega: rastreamento?.previsao_entrega || pedido.previsao_entrega || '',
-      data_postagem: rastreamento?.data_postagem || '',
-      endereco_entrega: {
-        destinatario: pedido.endereco_entrega?.nome || pedido.cliente_nome || '',
-        logradouro: pedido.endereco_entrega?.logradouro || '',
-        numero: pedido.endereco_entrega?.numero || '',
-        complemento: pedido.endereco_entrega?.complemento || '',
-        bairro: pedido.endereco_entrega?.bairro || '',
-        cidade: pedido.endereco_entrega?.cidade || '',
-        estado: pedido.endereco_entrega?.estado || '',
-        cep: pedido.endereco_entrega?.cep || ''
-      },
-      eventos: rastreamento?.eventos || []
-    };
-
-    return entregaBase;
-  }
-
-  /**
-   * Gera link de checkout para recuperação de carrinho
-   */
-  gerarLinkCheckout(carrinho) {
-    // O Magazord geralmente fornece um link, caso contrário usa base + carrinho_id
-    return carrinho.link_checkout || carrinho.link_recuperacao || `https://danajalecos.painel.magazord.com.br/carrinho/${carrinho.id}`;
   }
 
   /**
    * Retorna descrição do status do pedido
    */
-  getStatusDescricao(statusCodigo) {
-    const status = {
-      1: 'Pendente',
-      2: 'Em Processamento',
-      3: 'Enviado',
+  getStatusDescricao(status) {
+    const statusMap = {
+      0: 'Crédito e Cadastro Aprovados',
+      1: 'Aguardando Pagamento',
+      2: 'Pagamento em Análise',
+      3: 'Pago',
       4: 'Aprovado',
-      5: 'Cancelado',
-      6: 'Aguardando Pagamento',
-      7: 'Devolvido',
-      8: 'Reembolsado'
+      5: 'Em Separação',
+      6: 'Enviado',
+      7: 'Entregue',
+      8: 'Cancelado',
+      9: 'Devolvido'
     };
-    return status[statusCodigo] || 'Status Desconhecido';
+    
+    return statusMap[status] || `Status ${status}`;
+  }
+
+  /**
+   * Gera link de checkout para carrinho abandonado
+   */
+  gerarLinkCheckout(carrinho) {
+    if (carrinho.hash) {
+      return `https://danajalecos.painel.magazord.com.br/carrinho/${carrinho.hash}`;
+    }
+    return null;
   }
 }
 

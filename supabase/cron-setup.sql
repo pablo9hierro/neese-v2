@@ -41,7 +41,7 @@ $$ LANGUAGE plpgsql;
 -- Formato: (minuto hora dia mês dia_da_semana)
 SELECT cron.schedule(
   'sync-magazord-ghl',        -- Nome do job
-  '*/15 * * * *',              -- A cada 15 minutos
+  '*/03 * * * *',              -- A cada 15 minutos
   $$SELECT executar_sync_cron()$$
 );
 
