@@ -67,24 +67,35 @@ async function processarCarrinhos(dataInicio, dataFim) {
       let carrinhoCompleto = { ...carrinho };
       let cliente = null;
       let itens = [];
+      let pessoaId = null;
       
       try {
-        // 1. Buscar detalhes completos do carrinho
-        console.log(`   🔍 Buscando detalhes do carrinho ${carrinho.id}...`);
-        const detalhesCarrinho = await magazordService.buscarCarrinhoPorId(carrinho.id);
-        
-        if (detalhesCarrinho) {
-          carrinhoCompleto = { ...carrinho, ...detalhesCarrinho };
+        // 1. Se carrinho tem pedido associado, buscar o pedido para pegar pessoaId
+        if (carrinho.pedido && carrinho.pedido.id) {
+          console.log(`   🔍 Carrinho ${carrinho.id} tem pedido ${carrinho.pedido.id} - buscando dados...`);
+          const pedidoId = carrinho.pedido.id;
           
-          // 2. Se tem pessoa_id, buscar dados da pessoa
-          if (detalhesCarrinho.pessoa_id || detalhesCarrinho.pessoaId) {
-            const pessoaId = detalhesCarrinho.pessoa_id || detalhesCarrinho.pessoaId;
-            console.log(`   👤 Buscando pessoa ${pessoaId}...`);
+          // Buscar pedido na lista para pegar pessoaId
+          const dataInicio = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 dias atrás
+          const dataFim = new Date();
+          const pedidos = await magazordService.buscarPedidos(dataInicio, dataFim);
+          const pedidoEncontrado = pedidos.find(p => p.id === pedidoId);
+          
+          if (pedidoEncontrado && pedidoEncontrado.pessoaId) {
+            pessoaId = pedidoEncontrado.pessoaId;
+            console.log(`   👤 Pessoa ID encontrada: ${pessoaId}`);
+            
+            // Buscar dados completos da pessoa
             cliente = await magazordService.buscarPessoa(pessoaId);
+            
+            // Adicionar dados do pedido ao carrinho
+            carrinhoCompleto.pessoaNome = pedidoEncontrado.pessoaNome;
+            carrinhoCompleto.pessoaContato = pedidoEncontrado.pessoaContato;
+            carrinhoCompleto.valorTotal = pedidoEncontrado.valorTotal;
           }
         }
         
-        // 3. Buscar itens do carrinho
+        // 2. Buscar itens do carrinho
         console.log(`   📦 Buscando itens do carrinho ${carrinho.id}...`);
         itens = await magazordService.buscarItensCarrinho(carrinho.id);
         carrinhoCompleto.itens = itens;
@@ -104,13 +115,8 @@ async function processarCarrinhos(dataInicio, dataFim) {
         // Carrinho em checkout
         evento = transformerService.transformarCarrinhoCheckout(carrinhoCompleto, cliente);
       } else if (carrinho.status === 3 && carrinho.pedido) {
-        // Carrinho convertido - buscar pedido
-        try {
-          const pedido = await magazordService.buscarPedidoPorId(carrinho.pedido.id);
-          evento = transformerService.transformarPedido(pedido, carrinhoCompleto);
-        } catch (error) {
-          console.error(`Erro ao buscar pedido ${carrinho.pedido.id}:`, error.message);
-        }
+        // Carrinho convertido - processar como pedido
+        continue; // Será processado na função de pedidos
       } else if (carrinho.status === 4) {
         // Carrinho abandonado
         evento = transformerService.transformarCarrinhoAbandonado(carrinhoCompleto, cliente);
@@ -161,20 +167,45 @@ async function processarPedidos(dataInicio, dataFim) {
     
     const eventos = [];
     for (const pedido of pedidos) {
-      const identificador = `PEDIDO-${pedido.id}-${pedido.status}`;
+      const identificador = `PEDIDO-${pedido.id}-${pedido.pedidoSituacao}`;
       
       if (jaFoiProcessado(identificador)) {
         continue;
       }
 
+      // Pedidos da lista JÁ vêm com pessoaId, pessoaNome, pessoaContato!
+      let cliente = null;
       let rastreamento = null;
+      
       try {
-        rastreamento = await magazordService.buscarRastreamento(pedido.id);
+        // 1. Buscar dados completos da pessoa
+        if (pedido.pessoaId) {
+          console.log(`   👤 Buscando pessoa ${pedido.pessoaId} do pedido ${pedido.id}...`);
+          cliente = await magazordService.buscarPessoa(pedido.pessoaId);
+        }
+        
+        // 2. Buscar rastreamento se pedido foi enviado
+        if (pedido.pedidoSituacao >= 6) { // 6=Enviado, 7=Entregue
+          console.log(`   📦 Buscando rastreamento do pedido ${pedido.id}...`);
+          rastreamento = await magazordService.buscarRastreamento(pedido.id);
+        }
       } catch (error) {
-        // Rastreamento é opcional
+        console.log(`   ⚠️ Erro ao buscar dados do pedido ${pedido.id}:`, error.message);
       }
 
-      const evento = transformerService.transformarPedido(pedido, null, rastreamento);
+      // Montar pedido completo com dados da lista + cliente
+      const pedidoCompleto = {
+        ...pedido,
+        id: pedido.id,
+        codigo: pedido.codigo,
+        status: pedido.pedidoSituacao,
+        valorTotal: pedido.valorTotal,
+        formaPagamento: pedido.formaPagamentoNome,
+        dataPedido: pedido.dataHora,
+        dataAtualizacao: pedido.dataHora
+      };
+      
+      const evento = transformerService.transformarPedido(pedidoCompleto, null, rastreamento);
       
       if (!evento) {
         console.log(`   ⚠️  Pedido ${pedido.id} rejeitado (sem dados obrigatórios)`);

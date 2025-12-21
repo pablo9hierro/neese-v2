@@ -21,16 +21,24 @@ class TransformerService {
    * Extrai dados de pessoa do carrinho ou cliente
    */
   extrairDadosPessoa(carrinho, cliente) {
-    // Prioriza dados do cliente, depois do carrinho
-    const email = cliente?.email || carrinho?.email || carrinho?.cliente_email || '';
-    const telefone = cliente?.telefone || carrinho?.telefone || carrinho?.cliente_telefone || '';
-    const nome = cliente?.nome || carrinho?.nome || carrinho?.cliente_nome || 'Cliente não identificado';
+    // Prioriza dados do cliente API, depois do carrinho/pedido
+    const email = cliente?.email || carrinho?.email || carrinho?.cliente_email || carrinho?.pessoaEmail || '';
+    const telefone = cliente?.telefone || carrinho?.telefone || carrinho?.cliente_telefone || carrinho?.pessoaContato || '';
+    const nome = cliente?.nome || carrinho?.nome || carrinho?.cliente_nome || carrinho?.pessoaNome || 'Cliente não identificado';
     
     return {
       nome: nome.trim(),
       email: email.trim(),
-      telefone: telefone.trim()
+      telefone: this.formatarTelefone(telefone)
     };
+  }
+
+  /**
+   * Formata telefone para padrão brasileiro
+   */
+  formatarTelefone(telefone) {
+    if (!telefone) return '';
+    return telefone.toString().trim();
   }
 
   /**
