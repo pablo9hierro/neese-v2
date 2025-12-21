@@ -134,12 +134,27 @@ async function processarPedidos(dataInicio, dataFim) {
       return [];
     }
 
-    console.log(`   📦 Processando ${pedidos.length} pedidos...`);
+    // OTIMIZAÇÃO: Filtrar pedidos cancelados e sem contato ANTES de processar
+    const pedidosFiltrados = pedidos.filter(p => {
+      // Ignorar cancelados (status 8)
+      if (p.pedidoSituacao === 8) {
+        console.log(`   ⏭️  Pedido ${p.id} ignorado (cancelado)`);
+        return false;
+      }
+      // Ignorar sem telefone E sem possibilidade de email
+      if (!p.pessoaContato && !p.pessoaId) {
+        console.log(`   ⏭️  Pedido ${p.id} ignorado (sem contato)`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`   📦 Processando ${pedidosFiltrados.length} pedidos (${pedidos.length - pedidosFiltrados.length} ignorados)...`);
     
     const eventos = [];
     
     // OTIMIZAÇÃO: Buscar emails de TODAS as pessoas de uma vez (paralelo)
-    const pessoasIds = [...new Set(pedidos.filter(p => p.pessoaId).map(p => p.pessoaId))];
+    const pessoasIds = [...new Set(pedidosFiltrados.filter(p => p.pessoaId).map(p => p.pessoaId))];
     console.log(`\n   📧 Buscando emails de ${pessoasIds.length} pessoas em paralelo...`);
     
     const pessoasMap = {};
@@ -156,7 +171,7 @@ async function processarPedidos(dataInicio, dataFim) {
     console.log(`   ✅ ${Object.keys(pessoasMap).length} emails obtidos`);
     
     // Processar pedidos com os dados já obtidos
-    for (const pedido of pedidos) {
+    for (const pedido of pedidosFiltrados) {
       console.log(`\n   🔹 Pedido ${pedido.id}:`);
       console.log(`      - Status: ${pedido.pedidoSituacao}`);
       console.log(`      - Nome: ${pedido.pessoaNome}`);
@@ -217,7 +232,7 @@ async function processarPedidos(dataInicio, dataFim) {
       }
     }
 
-    console.log(`\n   ✅ Novos pedidos processados: ${eventos.length}/${pedidos.length}`);
+    console.log(`\n   ✅ Novos pedidos processados: ${eventos.length}/${pedidosFiltrados.length}`);
     return eventos;
   } catch (error) {
     console.error('❌ Erro ao processar pedidos:', error.message);
