@@ -16,10 +16,8 @@ const eventosProcessados = new Set();
  * Limpa cache de eventos em memória
  */
 function limparCache() {
-  if (eventosProcessados.size > 1000) {
-    eventosProcessados.clear();
-    console.log('🧹 Cache de eventos limpo');
-  }
+  eventosProcessados.clear();
+  console.log('🧹 Cache de eventos limpo');
 }
 
 /**
@@ -244,11 +242,9 @@ export async function executarSincronizacao() {
   let resultados = [];
 
   try {
-    // 1. Sistema incremental inteligente:
-    // - PRIMEIRA VEZ: busca últimas 12h de histórico
-    // - PRÓXIMAS: busca apenas desde última execução (5-10 min)
-    dataInicio = await supabaseService.obterUltimaExecucao();
-    dataFim = new Date();
+    // TEMPORÁRIO: Buscar apenas dia 20/12/2025
+    dataInicio = new Date('2025-12-20T00:00:00-03:00');
+    dataFim = new Date('2025-12-20T23:59:59-03:00');
     
     console.log(`\n📊 PERÍODO DE SINCRONIZAÇÃO:`);
     console.log(`   De: ${dataInicio.toISOString()} (${dataInicio.toLocaleString('pt-BR')})`);
@@ -256,11 +252,7 @@ export async function executarSincronizacao() {
     
     const diferencaMinutos = Math.floor((dataFim - dataInicio) / (1000 * 60));
     console.log(`   ⏱️  Janela: ${diferencaMinutos} minutos`);
-    if (diferencaMinutos > 60) {
-      console.log(`   🔄 Primeira execução ou gap longo - buscando histórico`);
-    } else {
-      console.log(`   ✅ Execução incremental - apenas dados novos`);
-    }    
+    console.log(`   🔄 Buscando dados do dia 20/12/2025`);    
     // 2. Limpa cache se necessário
     limparCache();
 
