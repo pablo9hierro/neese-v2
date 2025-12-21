@@ -68,6 +68,9 @@ class TransformerService {
         valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
         itens: this.transformarItens(carrinho.itens || [])
       },
+      pedido: {
+        status_codigo: 0
+      },
       origem: {
         fonte: 'magazord',
         capturado_em: new Date().toISOString(),
@@ -93,7 +96,7 @@ class TransformerService {
       tipo_evento: 'carrinho_abandonado',
       carrinho_id: carrinho.id,
       status: {
-        codigo: 4,
+        codigo: 2,
         descricao: 'Carrinho Abandonado',
         data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
       },
@@ -101,9 +104,12 @@ class TransformerService {
       carrinho: {
         carrinho_id: carrinho.id,
         status: 'abandonado',
-        status_codigo: 4,
+        status_codigo: 2,
         valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
         itens: this.transformarItens(carrinho.itens || [])
+      },
+      pedido: {
+        status_codigo: 0
       },
       origem: {
         fonte: 'magazord',
@@ -130,15 +136,21 @@ class TransformerService {
       tipo_evento: 'carrinho_checkout',
       carrinho_id: carrinho.id,
       status: {
-        codigo: 2,
-        descricao: 'Aguardando Pagamento',
+        codigo: 3,
+        descricao: 'Comprou (Aguardando Pagamento)',
         data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
       },
       pessoa,
       carrinho: {
         carrinho_id: carrinho.id,
         status: 'checkout',
-        status_codigo: 2,
+        status_codigo: 3,
+        valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
+        forma_pagamento: carrinho.forma_pagamento || carrinho.formaPagamento || 'Não informado',
+        itens: this.transformarItens(carrinho.itens || [])
+      },
+      pedido: {
+        status_codigo: 1,
         valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
         forma_pagamento: carrinho.forma_pagamento || carrinho.formaPagamento || 'Não informado',
         itens: this.transformarItens(carrinho.itens || [])
