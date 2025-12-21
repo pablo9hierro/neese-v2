@@ -244,14 +244,23 @@ export async function executarSincronizacao() {
   let resultados = [];
 
   try {
-    // 1. Usa janela de 12 horas (cron roda a cada 5 min)
+    // 1. Sistema incremental inteligente:
+    // - PRIMEIRA VEZ: busca últimas 12h de histórico
+    // - PRÓXIMAS: busca apenas desde última execução (5-10 min)
+    dataInicio = await supabaseService.obterUltimaExecucao();
     dataFim = new Date();
-    dataInicio = new Date(dataFim.getTime() - 12 * 60 * 60 * 1000); // 12 horas atrás
     
     console.log(`\n📊 PERÍODO DE SINCRONIZAÇÃO:`);
     console.log(`   De: ${dataInicio.toISOString()} (${dataInicio.toLocaleString('pt-BR')})`);
     console.log(`   Até: ${dataFim.toISOString()} (${dataFim.toLocaleString('pt-BR')})`);
     
+    const diferencaMinutos = Math.floor((dataFim - dataInicio) / (1000 * 60));
+    console.log(`   ⏱️  Janela: ${diferencaMinutos} minutos`);
+    if (diferencaMinutos > 60) {
+      console.log(`   🔄 Primeira execução ou gap longo - buscando histórico`);
+    } else {
+      console.log(`   ✅ Execução incremental - apenas dados novos`);
+    }    
     // 2. Limpa cache se necessário
     limparCache();
 
