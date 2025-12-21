@@ -13,12 +13,12 @@ jobs:
     name: Executar Sincronização
     
     steps:
-      - name: 🚀 Trigger Supabase Edge Function
+      - name: 🚀 Trigger Vercel API
         run: |
-          echo "🔄 Iniciando sincronização via Supabase Edge Function..."
+          echo "🔄 Iniciando sincronização via Vercel..."
           
           response=$(curl -s -w "\n%{http_code}" \
-            -X GET 'https://gyxjuxmwnwyansfoabyv.supabase.co/functions/v1/sync-cron' \
+            -X GET 'https://neese-23vy.vercel.app/api/cron' \
             -H 'Content-Type: application/json')
           
           http_code=$(echo "$response" | tail -n1)
@@ -39,4 +39,4 @@ jobs:
         run: |
           echo "⏰ Executado em: $(date)"
           echo "🔗 Projeto: neese"
-          echo "🎯 Supabase Project: gyxjuxmwnwyansfoabyv"
+          echo "🎯 Vercel: neese-23vy.vercel.app"
