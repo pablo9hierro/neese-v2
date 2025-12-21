@@ -7,6 +7,10 @@ export default {
   ghl: {
     webhookUrl: process.env.GHL_WEBHOOK_URL || 'https://services.leadconnectorhq.com/hooks/scD4yzuj3zsDsqfrgvtZ/webhook-trigger/b6fd6bb0-15ef-4af5-af2b-3122b92376b6'
   },
+  supabase: {
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://gyxjuxmwnwyansfoabyv.supabase.co',
+    serviceKey: process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5eGp1eG13bnd5YW5zZm9hYnl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE3NjEwNywiZXhwIjoyMDgxNzUyMTA3fQ.Dw_qvsXu_SOCQiuH3KXcryuZ3Tzjg23sZxTNNXPEy8c'
+  },
   sync: {
     intervalMinutes: parseInt(process.env.SYNC_INTERVAL) || 20
   },
