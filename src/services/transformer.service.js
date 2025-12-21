@@ -168,17 +168,23 @@ class TransformerService {
     const statusDescricao = this.getStatusDescricao(pedido.status);
     const temRastreio = rastreamento && (rastreamento.codigo || rastreamento.codigoRastreio);
 
+    const statusCodigo = pedido.pedidoSituacao || pedido.status || 0;
+    
     const evento = {
       tipo_evento: 'status_atualizado',
       pedido_id: pedido.id,
       pedido_codigo: pedido.codigo || `PEDIDO-${pedido.id}`,
       status: {
-        codigo: pedido.pedidoSituacao || pedido.status || 0,
-        descricao: this.getStatusDescricao(pedido.pedidoSituacao || pedido.status),
+        codigo: statusCodigo,
+        descricao: this.getStatusDescricao(statusCodigo),
         data_atualizacao: pedido.dataHora || pedido.dataAtualizacao || pedido.data_atualizacao || new Date().toISOString()
       },
       pessoa,
+      carrinho: {
+        status_codigo: carrinho ? (carrinho.status || 0) : 0
+      },
       pedido: {
+        status_codigo: statusCodigo,
         data_pedido: pedido.dataHora || pedido.dataPedido || pedido.data_pedido || new Date().toISOString(),
         valor_total: pedido.valorTotal || pedido.valor_total || '0.00',
         forma_pagamento: pedido.formaPagamentoNome || pedido.formaPagamento || pedido.forma_pagamento || 'Não informado',
