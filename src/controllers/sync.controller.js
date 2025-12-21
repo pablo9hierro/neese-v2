@@ -139,10 +139,28 @@ async function processarPedidos(dataInicio, dataFim) {
     console.log(`   📦 Processando ${pedidos.length} pedidos...`);
     
     const eventos = [];
+    
+    // OTIMIZAÇÃO: Buscar emails de TODAS as pessoas de uma vez (paralelo)
+    const pessoasIds = [...new Set(pedidos.filter(p => p.pessoaId).map(p => p.pessoaId))];
+    console.log(`\n   📧 Buscando emails de ${pessoasIds.length} pessoas em paralelo...`);
+    
+    const pessoasMap = {};
+    const pessoasPromises = pessoasIds.map(async (id) => {
+      try {
+        const pessoa = await magazordService.buscarPessoa(id);
+        if (pessoa) pessoasMap[id] = pessoa;
+      } catch (err) {
+        console.log(`      ⚠️ Erro ao buscar pessoa ${id}: ${err.message}`);
+      }
+    });
+    
+    await Promise.all(pessoasPromises);
+    console.log(`   ✅ ${Object.keys(pessoasMap).length} emails obtidos`);
+    
+    // Processar pedidos com os dados já obtidos
     for (const pedido of pedidos) {
       console.log(`\n   🔹 Pedido ${pedido.id}:`);
       console.log(`      - Status: ${pedido.pedidoSituacao}`);
-      console.log(`      - PessoaId: ${pedido.pessoaId}`);
       console.log(`      - Nome: ${pedido.pessoaNome}`);
       console.log(`      - Contato: ${pedido.pessoaContato}`);
       
@@ -153,35 +171,29 @@ async function processarPedidos(dataInicio, dataFim) {
         continue;
       }
 
-      // Pedidos da lista JÁ vêm com pessoaId, pessoaNome, pessoaContato!
-      let cliente = null;
-      let rastreamento = null;
-      
-      try {
-        // 1. Buscar dados completos da pessoa
-        if (pedido.pessoaId) {
-          console.log(`      🔍 Buscando pessoa ${pedido.pessoaId}...`);
-          cliente = await magazordService.buscarPessoa(pedido.pessoaId);
-          console.log(`      ✅ Pessoa: ${cliente ? cliente.nome : 'não encontrada'}`);
-          console.log(`         Email: ${cliente ? cliente.email : 'N/A'}`);
-        }
-        
-        // 2. Buscar rastreamento se pedido foi enviado
-        if (pedido.pedidoSituacao >= 6) {
-          console.log(`      🔍 Buscando rastreamento...`);
-          rastreamento = await magazordService.buscarRastreamento(pedido.id);
-        }
-      } catch (error) {
-        console.log(`      ⚠️ Erro ao buscar dados: ${error.message}`);
+      // Usar dados já obtidos (sem novas requisições!)
+      const cliente = pedido.pessoaId ? pessoasMap[pedido.pessoaId] : null;
+      if (cliente) {
+        console.log(`      ✅ Email: ${cliente.email || 'N/A'}`);
       }
 
       // Montar pedido completo
       const pedidoCompleto = {
         ...pedido,
-        clienteAPI: cliente // Passar cliente completo
+        clienteAPI: cliente
       };
       
       console.log(`      🔄 Transformando pedido...`);
+      // Rastreamento: opcional, só busca se realmente necessário (pedido enviado)
+      let rastreamento = null;
+      if (pedido.pedidoSituacao >= 6) {
+        try {
+          rastreamento = await magazordService.buscarRastreamento(pedido.id);
+        } catch (err) {
+          console.log(`      ⚠️ Rastreamento não encontrado`);
+        }
+      }
+      
       const evento = transformerService.transformarPedido(pedidoCompleto, null, rastreamento);
       
       if (!evento) {
