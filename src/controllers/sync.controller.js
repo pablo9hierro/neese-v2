@@ -264,18 +264,22 @@ export async function executarSincronizacao() {
     // 2. Limpa cache se necessário
     limparCache();
 
-    // 3. Processa APENAS PEDIDOS (dados de pessoa garantidos)
+    // 3. Processa CARRINHOS e PEDIDOS
+    console.log('\n🛒 Processando carrinhos...');
+    const eventosCarrinhos = await processarCarrinhos(dataInicio, dataFim);
+    
     console.log('\n📦 Processando pedidos...');
     const eventosPedidos = await processarPedidos(dataInicio, dataFim);
 
     // Junta todos os eventos
-    const todosEventos = [...eventosPedidos];
+    const todosEventos = [...eventosCarrinhos, ...eventosPedidos];
     totalEventos = todosEventos.length;
 
     if (totalEventos === 0) {
       console.log('\n✅ NENHUM EVENTO NOVO - Sistema atualizado!');
     } else {
       console.log(`\n📊 RESUMO: ${totalEventos} eventos novos encontrados`);
+      console.log(`    Carrinhos: ${eventosCarrinhos.length}`);
       console.log(`    Pedidos: ${eventosPedidos.length}`);
       console.log('\n📤 ENVIANDO PARA GHL...');
 
