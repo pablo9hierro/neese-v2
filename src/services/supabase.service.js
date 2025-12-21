@@ -82,7 +82,8 @@ class SupabaseService {
    */
   getInicioDoDia() {
     const hoje = new Date();
-    hoje.setHours(hoje.getHours() - 24, 0, 0, 0); // 24 horas atrás
+    hoje.setHours(hoje.getHours() - (7 * 24), 0, 0, 0); // 7 dias atrás
+    console.error(`⏰ Primeira execução - buscando desde: ${hoje.toISOString()}`);
     return hoje;
   }
 

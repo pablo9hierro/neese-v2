@@ -134,7 +134,8 @@ class MagazordService {
         auth: this.auth,
         params: {
           dataAtualizacaoInicio: dataInicioStr,
-          dataAtualizacaoFim: dataFimStr
+          dataAtualizacaoFim: dataFimStr,
+          limit: 100
         }
       });
 
