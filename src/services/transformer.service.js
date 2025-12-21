@@ -173,15 +173,15 @@ class TransformerService {
       pedido_id: pedido.id,
       pedido_codigo: pedido.codigo || `PEDIDO-${pedido.id}`,
       status: {
-        codigo: pedido.status || 0,
-        descricao: statusDescricao,
-        data_atualizacao: pedido.dataAtualizacao || pedido.data_atualizacao || new Date().toISOString()
+        codigo: pedido.pedidoSituacao || pedido.status || 0,
+        descricao: this.getStatusDescricao(pedido.pedidoSituacao || pedido.status),
+        data_atualizacao: pedido.dataHora || pedido.dataAtualizacao || pedido.data_atualizacao || new Date().toISOString()
       },
       pessoa,
       pedido: {
-        data_pedido: pedido.dataPedido || pedido.data_pedido || new Date().toISOString(),
+        data_pedido: pedido.dataHora || pedido.dataPedido || pedido.data_pedido || new Date().toISOString(),
         valor_total: pedido.valorTotal || pedido.valor_total || '0.00',
-        forma_pagamento: pedido.formaPagamento || pedido.forma_pagamento || 'Não informado',
+        forma_pagamento: pedido.formaPagamentoNome || pedido.formaPagamento || pedido.forma_pagamento || 'Não informado',
         link_pagamento: pedido.linkPagamento || pedido.link_pagamento || null,
         itens: this.transformarItens(pedido.itens || [])
       },
