@@ -129,19 +129,27 @@ async function processarPedidos(dataInicio, dataFim) {
     console.log(`   📅 Período: ${dataInicio.toISOString()} → ${dataFim.toISOString()}`);
     
     const pedidos = await magazordService.buscarPedidos(dataInicio, dataFim);
+    console.log(`   🔍 API retornou: ${pedidos ? pedidos.length : 0} pedidos`);
     
     if (!pedidos || pedidos.length === 0) {
       console.log('   ✓ Nenhum pedido novo ou atualizado');
       return [];
     }
 
-    console.log(`   📦 Encontrados: ${pedidos.length} pedidos`);
+    console.log(`   📦 Processando ${pedidos.length} pedidos...`);
     
     const eventos = [];
     for (const pedido of pedidos) {
+      console.log(`\n   🔹 Pedido ${pedido.id}:`);
+      console.log(`      - Status: ${pedido.pedidoSituacao}`);
+      console.log(`      - PessoaId: ${pedido.pessoaId}`);
+      console.log(`      - Nome: ${pedido.pessoaNome}`);
+      console.log(`      - Contato: ${pedido.pessoaContato}`);
+      
       const identificador = `PEDIDO-${pedido.id}-${pedido.pedidoSituacao}`;
       
       if (jaFoiProcessado(identificador)) {
+        console.log(`      ⏭️  Já processado`);
         continue;
       }
 
@@ -152,37 +160,36 @@ async function processarPedidos(dataInicio, dataFim) {
       try {
         // 1. Buscar dados completos da pessoa
         if (pedido.pessoaId) {
-          console.log(`   👤 Buscando pessoa ${pedido.pessoaId} do pedido ${pedido.id}...`);
+          console.log(`      🔍 Buscando pessoa ${pedido.pessoaId}...`);
           cliente = await magazordService.buscarPessoa(pedido.pessoaId);
+          console.log(`      ✅ Pessoa: ${cliente ? cliente.nome : 'não encontrada'}`);
+          console.log(`         Email: ${cliente ? cliente.email : 'N/A'}`);
         }
         
         // 2. Buscar rastreamento se pedido foi enviado
-        if (pedido.pedidoSituacao >= 6) { // 6=Enviado, 7=Entregue
-          console.log(`   📦 Buscando rastreamento do pedido ${pedido.id}...`);
+        if (pedido.pedidoSituacao >= 6) {
+          console.log(`      🔍 Buscando rastreamento...`);
           rastreamento = await magazordService.buscarRastreamento(pedido.id);
         }
       } catch (error) {
-        console.log(`   ⚠️ Erro ao buscar dados do pedido ${pedido.id}:`, error.message);
+        console.log(`      ⚠️ Erro ao buscar dados: ${error.message}`);
       }
 
-      // Montar pedido completo com dados da lista + cliente
+      // Montar pedido completo
       const pedidoCompleto = {
         ...pedido,
-        id: pedido.id,
-        codigo: pedido.codigo,
-        status: pedido.pedidoSituacao,
-        valorTotal: pedido.valorTotal,
-        formaPagamento: pedido.formaPagamentoNome,
-        dataPedido: pedido.dataHora,
-        dataAtualizacao: pedido.dataHora
+        clienteAPI: cliente // Passar cliente completo
       };
       
+      console.log(`      🔄 Transformando pedido...`);
       const evento = transformerService.transformarPedido(pedidoCompleto, null, rastreamento);
       
       if (!evento) {
-        console.log(`   ⚠️  Pedido ${pedido.id} rejeitado (sem dados obrigatórios)`);
+        console.log(`      ❌ Rejeitado (sem dados obrigatórios)`);
         continue;
       }
+      
+      console.log(`      ✅ Evento criado!`);
       
       // Tenta registrar no Supabase (evita duplicatas)
       const isNovo = await supabaseService.registrarEvento(
@@ -194,13 +201,17 @@ async function processarPedidos(dataInicio, dataFim) {
       if (isNovo) {
         eventos.push(evento);
         marcarProcessado(identificador);
+        console.log(`      ✅ Adicionado à fila de envio`);
+      } else {
+        console.log(`      ⏭️  Duplicado (já registrado no Supabase)`);
       }
     }
 
-    console.log(`   ✅ Novos pedidos processados: ${eventos.length}`);
+    console.log(`\n   ✅ Novos pedidos processados: ${eventos.length}/${pedidos.length}`);
     return eventos;
   } catch (error) {
     console.error('❌ Erro ao processar pedidos:', error.message);
+    console.error(error.stack);
     return [];
   }
 }
