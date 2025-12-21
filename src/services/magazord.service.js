@@ -42,8 +42,7 @@ class MagazordService {
       
       const params = {
         dataAtualizacaoInicio: dataInicioFormatada,
-        dataAtualizacaoFim: dataFimFormatada,
-        limit: 20
+        dataAtualizacaoFim: dataFimFormatada
       };
       
       if (status) {
