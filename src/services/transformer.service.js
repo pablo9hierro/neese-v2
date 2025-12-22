@@ -189,7 +189,7 @@ class TransformerService {
     const statusCodigo = pedido.pedidoSituacao || pedido.status || 0;
     
     const evento = {
-      tipo_evento: 'status_atualizado',
+      tipo_evento: this.getTipoEventoPedido(statusCodigo),
       pedido_id: pedido.id,
       pedido_codigo: pedido.codigo || `PEDIDO-${pedido.id}`,
       status: {
@@ -258,6 +258,27 @@ class TransformerService {
       valor_unitario: item.valor_unitario || item.valorUnitario || item.preco || '0.00',
       valor_total: item.valor_total || item.valorTotal || '0.00'
     }));
+  }
+
+  /**
+   * Retorna tipo_evento específico baseado no status do pedido
+   * NUNCA MAIS GENÉRICO!
+   */
+  getTipoEventoPedido(status) {
+    const tipoEventoMap = {
+      0: 'pedido_credito_aprovado',
+      1: 'pedido_aguardando_pagamento',
+      2: 'pedido_pagamento_analise',
+      3: 'pedido_pago',
+      4: 'pedido_aprovado',
+      5: 'pedido_em_separacao',
+      6: 'pedido_enviado',
+      7: 'pedido_entregue',
+      8: 'pedido_cancelado',
+      9: 'pedido_devolvido'
+    };
+    
+    return tipoEventoMap[status] || `pedido_status_${status}`;
   }
 
   /**
