@@ -21,20 +21,26 @@ class TransformerService {
    * Extrai dados de pessoa do pedido/carrinho e cliente da API
    */
   extrairDadosPessoa(dados, clienteAPI) {
-    // Usar dados do cliente API se disponível
-    if (clienteAPI && clienteAPI.email) {
-      return {
-        nome: clienteAPI.nome || dados.pessoaNome || 'Cliente',
-        email: clienteAPI.email || '',
-        telefone: dados.pessoaContato || clienteAPI.telefone || ''
-      };
+    // DEBUG: Log para verificar dados recebidos
+    if (clienteAPI) {
+      console.log(`      🔍 DEBUG clienteAPI:`, JSON.stringify({
+        nome: clienteAPI.nome,
+        email: clienteAPI.email,
+        telefone: clienteAPI.telefone
+      }));
     }
     
-    // Usar dados do pedido/carrinho
+    // Priorizar dados do clienteAPI (email completo da API /pessoa/{id})
+    const email = (clienteAPI?.email || dados.pessoaEmail || dados.email || '').trim();
+    const telefone = (dados.pessoaContato || clienteAPI?.telefone || dados.telefone || '').trim();
+    const nome = (clienteAPI?.nome || dados.pessoaNome || dados.nome || 'Cliente').trim();
+    
+    console.log(`      📧 DEBUG pessoa extraída:`, JSON.stringify({ nome, email, telefone }));
+    
     return {
-      nome: dados.pessoaNome || dados.nome || 'Cliente',
-      email: dados.pessoaEmail || dados.email || '',
-      telefone: dados.pessoaContato || dados.telefone || ''
+      nome,
+      email,
+      telefone
     };
   }
 
@@ -96,7 +102,7 @@ class TransformerService {
       tipo_evento: 'carrinho_abandonado',
       carrinho_id: carrinho.id,
       status: {
-        codigo: 2,
+        codigo: 4,
         descricao: 'Carrinho Abandonado',
         data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
       },
@@ -104,7 +110,7 @@ class TransformerService {
       carrinho: {
         carrinho_id: carrinho.id,
         status: 'abandonado',
-        status_codigo: 2,
+        status_codigo: 4,
         valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
         itens: this.transformarItens(carrinho.itens || [])
       },
@@ -136,7 +142,7 @@ class TransformerService {
       tipo_evento: 'carrinho_checkout',
       carrinho_id: carrinho.id,
       status: {
-        codigo: 3,
+        codigo: 2,
         descricao: 'Comprou (Aguardando Pagamento)',
         data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
       },
@@ -144,7 +150,7 @@ class TransformerService {
       carrinho: {
         carrinho_id: carrinho.id,
         status: 'checkout',
-        status_codigo: 3,
+        status_codigo: 2,
         valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
         forma_pagamento: carrinho.forma_pagamento || carrinho.formaPagamento || 'Não informado',
         itens: this.transformarItens(carrinho.itens || [])
@@ -169,8 +175,8 @@ class TransformerService {
    * Dados condicionais: entrega (só quando tem rastreio)
    */
   transformarPedido(pedido, carrinho = null, rastreamento = null) {
-    // Extrai pessoa do pedido ou carrinho
-    const pessoa = this.extrairDadosPessoa(pedido, null);
+    // Extrai pessoa do pedido ou carrinho (usando clienteAPI se disponível)
+    const pessoa = this.extrairDadosPessoa(pedido, pedido.clienteAPI);
     
     if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
       console.log(`⚠️  Pedido ${pedido.id} sem dados de contato - IGNORADO`);
