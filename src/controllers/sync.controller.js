@@ -4,6 +4,12 @@ import transformerService from '../services/transformer.service.js';
 import supabaseService from '../services/supabase.service.js';
 
 /**
+ * STATUS PERMITIDOS - Eventos que o usuário quer
+ */
+const STATUS_CARRINHO_PERMITIDOS = [1, 2, 4]; // Aberto, Checkout, Abandonado
+const STATUS_PEDIDO_PERMITIDOS = [1, 2, 4, 5, 6, 7]; // Aguardando, Cancelado, Aprovado, Aprovado+Integrado, NF Emitida, Transporte
+
+/**
  * Controlador principal para sincronização automática (Cron Job)
  * Sistema incremental: busca apenas desde a última execução
  * Persistência via Supabase para garantir continuidade entre execuções
@@ -53,8 +59,19 @@ async function processarCarrinhos(dataInicio, dataFim) {
 
     console.log(`   📦 Encontrados: ${carrinhos.length} carrinhos`);
     
+    // FILTRO: Apenas status permitidos
+    const carrinhosFiltrados = carrinhos.filter(c => {
+      if (!STATUS_CARRINHO_PERMITIDOS.includes(c.status)) {
+        console.log(`   ⏭️  Carrinho ${c.id} ignorado (status ${c.status} não permitido)`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`   ✅ Após filtro: ${carrinhosFiltrados.length} carrinhos válidos`);
+    
     const eventos = [];
-    for (const carrinho of carrinhos) {
+    for (const carrinho of carrinhosFiltrados) {
       const identificador = `CARRINHO-${carrinho.id}-${carrinho.status}`;
       
       if (jaFoiProcessado(identificador)) {
@@ -66,30 +83,44 @@ async function processarCarrinhos(dataInicio, dataFim) {
         continue;
       }
 
-      // SKIP: Carrinhos abertos (status 1) e abandonados (status 4) raramente têm dados de contato
-      // Apenas processar checkout (status 2) que tem mais chance de ter pessoa
-      if (carrinho.status === 1 || carrinho.status === 4) {
-        console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status ${carrinho.status}) - sem garantia de contato`);
-        continue;
-      }
-
       let carrinhoCompleto = { ...carrinho };
       let cliente = null;
       let itens = [];
       
       try {
+        // BUSCAR DADOS DE PESSOA (email/telefone) se tiver pessoa_id
+        if (carrinho.pessoa_id || carrinho.pessoaId) {
+          try {
+            const pessoaId = carrinho.pessoa_id || carrinho.pessoaId;
+            console.log(`      📧 Buscando pessoa ${pessoaId}...`);
+            cliente = await magazordService.buscarPessoa(pessoaId);
+            
+            if (cliente && (cliente.email || cliente.telefone)) {
+              console.log(`      ✅ Email: ${cliente.email || 'N/A'} | Tel: ${cliente.telefone || 'N/A'}`);
+            } else {
+              console.log(`      ⚠️ Pessoa ${pessoaId} sem email/telefone`);
+            }
+          } catch (erroPessoa) {
+            console.log(`      ⚠️ Erro ao buscar pessoa: ${erroPessoa.message}`);
+          }
+        }
+        
         // Buscar itens do carrinho
         itens = await magazordService.buscarItensCarrinho(carrinho.id);
         carrinhoCompleto.itens = itens;
         
       } catch (error) {
-        console.log(`   ⚠️ Erro ao buscar itens do carrinho ${carrinho.id}:`, error.message);
+        console.log(`   ⚠️ Erro ao buscar dados do carrinho ${carrinho.id}:`, error.message);
       }
 
-      // Processar apenas checkout (status 2)
+      // Processar baseado no status
       let evento = null;
-      if (carrinho.status === 2) {
+      if (carrinho.status === 1) {
+        evento = transformerService.transformarCarrinhoAberto(carrinhoCompleto, cliente);
+      } else if (carrinho.status === 2) {
         evento = transformerService.transformarCarrinhoCheckout(carrinhoCompleto, cliente);
+      } else if (carrinho.status === 4) {
+        evento = transformerService.transformarCarrinhoAbandonado(carrinhoCompleto, cliente);
       }
       
       if (evento) {
@@ -134,14 +165,14 @@ async function processarPedidos(dataInicio, dataFim) {
       return [];
     }
 
-    // OTIMIZAÇÃO: Filtrar pedidos cancelados e sem contato ANTES de processar
+    // FILTRO: Apenas status permitidos + tem possibilidade de contato
     const pedidosFiltrados = pedidos.filter(p => {
-      // Ignorar cancelados (status 8)
-      if (p.pedidoSituacao === 8) {
-        console.log(`   ⏭️  Pedido ${p.id} ignorado (cancelado)`);
+      // Ignorar status não permitidos
+      if (!STATUS_PEDIDO_PERMITIDOS.includes(p.pedidoSituacao)) {
+        console.log(`   ⏭️  Pedido ${p.id} ignorado (status ${p.pedidoSituacao} não permitido)`);
         return false;
       }
-      // Ignorar sem telefone E sem possibilidade de email
+      // Ignorar sem telefone E sem possibilidade de email (pessoaId)
       if (!p.pessoaContato && !p.pessoaId) {
         console.log(`   ⏭️  Pedido ${p.id} ignorado (sem contato)`);
         return false;
