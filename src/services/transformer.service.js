@@ -189,7 +189,7 @@ class TransformerService {
     const statusCodigo = pedido.pedidoSituacao || pedido.status || 0;
     
     const evento = {
-      tipo_evento: this.getTipoEventoPedido(statusCodigo),
+      tipo_evento: 'status_atualizado',
       pedido_id: pedido.id,
       pedido_codigo: pedido.codigo || `PEDIDO-${pedido.id}`,
       status: {
