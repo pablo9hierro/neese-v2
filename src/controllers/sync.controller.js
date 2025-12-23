@@ -4,12 +4,6 @@ import transformerService from '../services/transformer.service.js';
 import supabaseService from '../services/supabase.service.js';
 
 /**
- * STATUS PERMITIDOS - Eventos que o usuário quer
- */
-const STATUS_CARRINHO_PERMITIDOS = [1, 2, 4]; // Aberto, Checkout, Abandonado
-const STATUS_PEDIDO_PERMITIDOS = [1, 2, 4, 5, 6, 7]; // Aguardando, Cancelado, Aprovado, Aprovado+Integrado, NF Emitida, Transporte
-
-/**
  * Controlador principal para sincronização automática (Cron Job)
  * Sistema incremental: busca apenas desde a última execução
  * Persistência via Supabase para garantir continuidade entre execuções
@@ -59,19 +53,8 @@ async function processarCarrinhos(dataInicio, dataFim) {
 
     console.log(`   📦 Encontrados: ${carrinhos.length} carrinhos`);
     
-    // FILTRO: Apenas status permitidos
-    const carrinhosFiltrados = carrinhos.filter(c => {
-      if (!STATUS_CARRINHO_PERMITIDOS.includes(c.status)) {
-        console.log(`   ⏭️  Carrinho ${c.id} ignorado (status ${c.status} não permitido)`);
-        return false;
-      }
-      return true;
-    });
-
-    console.log(`   ✅ Após filtro: ${carrinhosFiltrados.length} carrinhos válidos`);
-    
     const eventos = [];
-    for (const carrinho of carrinhosFiltrados) {
+    for (const carrinho of carrinhos) {
       const identificador = `CARRINHO-${carrinho.id}-${carrinho.status}`;
       
       if (jaFoiProcessado(identificador)) {
@@ -80,6 +63,13 @@ async function processarCarrinhos(dataInicio, dataFim) {
 
       // SKIP: Carrinho convertido será processado como pedido
       if (carrinho.status === 3) {
+        console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status 3 - convertido em pedido)`);
+        continue;
+      }
+
+      // Processar apenas status relevantes: 1 (aberto), 2 (checkout), 4 (abandonado)
+      if (![1, 2, 4].includes(carrinho.status)) {
+        console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status ${carrinho.status} - não rastreado)`);
         continue;
       }
 
@@ -88,33 +78,27 @@ async function processarCarrinhos(dataInicio, dataFim) {
       let itens = [];
       
       try {
-        // BUSCAR DADOS DE PESSOA (email/telefone) se tiver pessoa_id
-        if (carrinho.pessoa_id || carrinho.pessoaId) {
-          try {
-            const pessoaId = carrinho.pessoa_id || carrinho.pessoaId;
-            console.log(`      📧 Buscando pessoa ${pessoaId}...`);
-            cliente = await magazordService.buscarPessoa(pessoaId);
-            
-            if (cliente && (cliente.email || cliente.telefone)) {
-              console.log(`      ✅ Email: ${cliente.email || 'N/A'} | Tel: ${cliente.telefone || 'N/A'}`);
-            } else {
-              console.log(`      ⚠️ Pessoa ${pessoaId} sem email/telefone`);
-            }
-          } catch (erroPessoa) {
-            console.log(`      ⚠️ Erro ao buscar pessoa: ${erroPessoa.message}`);
-          }
-        }
-        
         // Buscar itens do carrinho
         itens = await magazordService.buscarItensCarrinho(carrinho.id);
         carrinhoCompleto.itens = itens;
+        
+        // NOVO: Buscar dados da pessoa se tiver pessoaId (para obter email/telefone)
+        if (carrinho.pessoaId) {
+          try {
+            cliente = await magazordService.buscarPessoa(carrinho.pessoaId);
+            console.log(`   ✅ Dados da pessoa ${carrinho.pessoaId} obtidos - Email: ${cliente?.email || 'N/A'}`);
+          } catch (error) {
+            console.log(`   ⚠️ Erro ao buscar pessoa ${carrinho.pessoaId}:`, error.message);
+          }
+        }
         
       } catch (error) {
         console.log(`   ⚠️ Erro ao buscar dados do carrinho ${carrinho.id}:`, error.message);
       }
 
-      // Processar baseado no status
+      // Processar TODOS os status relevantes (1, 2, 4)
       let evento = null;
+      
       if (carrinho.status === 1) {
         evento = transformerService.transformarCarrinhoAberto(carrinhoCompleto, cliente);
       } else if (carrinho.status === 2) {
@@ -134,9 +118,10 @@ async function processarCarrinhos(dataInicio, dataFim) {
         if (isNovo) {
           eventos.push(evento);
           marcarProcessado(identificador);
+          console.log(`   ✅ Carrinho ${carrinho.id} (status ${carrinho.status}) adicionado à fila`);
         }
       } else {
-        console.log(`   ⚠️  Carrinho ${carrinho.id} rejeitado (sem dados obrigatórios)`);
+        console.log(`   ⚠️  Carrinho ${carrinho.id} rejeitado (sem email/telefone)`);
       }
     }
     
@@ -165,27 +150,25 @@ async function processarPedidos(dataInicio, dataFim) {
       return [];
     }
 
-    // FILTRO: Apenas status permitidos + tem possibilidade de contato
-    const pedidosFiltrados = pedidos.filter(p => {
-      // Ignorar status não permitidos
-      if (!STATUS_PEDIDO_PERMITIDOS.includes(p.pedidoSituacao)) {
-        console.log(`   ⏭️  Pedido ${p.id} ignorado (status ${p.pedidoSituacao} não permitido)`);
-        return false;
-      }
-      // Ignorar sem telefone E sem possibilidade de email (pessoaId)
-      if (!p.pessoaContato && !p.pessoaId) {
-        console.log(`   ⏭️  Pedido ${p.id} ignorado (sem contato)`);
-        return false;
-      }
-      return true;
-    });
+    // 🎯 FILTRO: APENAS PEDIDOS CANCELADOS (status 8) - Economia de requisições GHL
+    const pedidosCancelados = pedidos.filter(p => p.pedidoSituacao === 8);
+    const ignorados = pedidos.length - pedidosCancelados.length;
+    
+    if (ignorados > 0) {
+      console.log(`   ⏭️  ${ignorados} pedidos ignorados (enviando apenas cancelados - status 8)`);
+    }
+    
+    if (pedidosCancelados.length === 0) {
+      console.log('   ✓ Nenhum pedido cancelado (status 8) encontrado');
+      return [];
+    }
 
-    console.log(`   📦 Processando ${pedidosFiltrados.length} pedidos (${pedidos.length - pedidosFiltrados.length} ignorados)...`);
+    console.log(`   📦 Processando ${pedidosCancelados.length} pedidos cancelados...`);
     
     const eventos = [];
     
     // OTIMIZAÇÃO: Buscar emails de TODAS as pessoas de uma vez (paralelo)
-    const pessoasIds = [...new Set(pedidosFiltrados.filter(p => p.pessoaId).map(p => p.pessoaId))];
+    const pessoasIds = [...new Set(pedidosCancelados.filter(p => p.pessoaId).map(p => p.pessoaId))];
     console.log(`\n   📧 Buscando emails de ${pessoasIds.length} pessoas em paralelo...`);
     
     const pessoasMap = {};
@@ -201,10 +184,10 @@ async function processarPedidos(dataInicio, dataFim) {
     await Promise.all(pessoasPromises);
     console.log(`   ✅ ${Object.keys(pessoasMap).length} emails obtidos`);
     
-    // Processar pedidos com os dados já obtidos
-    for (const pedido of pedidosFiltrados) {
+    // Processar pedidos cancelados com os dados já obtidos
+    for (const pedido of pedidosCancelados) {
       console.log(`\n   🔹 Pedido ${pedido.id}:`);
-      console.log(`      - Status: ${pedido.pedidoSituacao}`);
+      console.log(`      - Status: 8 (CANCELADO)`);
       console.log(`      - Nome: ${pedido.pessoaNome}`);
       console.log(`      - Contato: ${pedido.pessoaContato}`);
       
@@ -263,7 +246,7 @@ async function processarPedidos(dataInicio, dataFim) {
       }
     }
 
-    console.log(`\n   ✅ Novos pedidos processados: ${eventos.length}/${pedidosFiltrados.length}`);
+    console.log(`\n   ✅ Novos pedidos processados: ${eventos.length}/${pedidos.length}`);
     return eventos;
   } catch (error) {
     console.error('❌ Erro ao processar pedidos:', error.message);
@@ -288,9 +271,9 @@ export async function executarSincronizacao() {
   let resultados = [];
 
   try {
-    // BUSCAR APENAS DIA 21/12/2025
-    dataInicio = new Date('2025-12-21T00:00:00-03:00');
-    dataFim = new Date('2025-12-21T23:59:59-03:00');
+    // TEMPORÁRIO: Buscar apenas dia 20/12/2025
+    dataInicio = new Date('2025-12-20T00:00:00-03:00');
+    dataFim = new Date('2025-12-20T23:59:59-03:00');
     
     console.log(`\n📊 PERÍODO DE SINCRONIZAÇÃO:`);
     console.log(`   De: ${dataInicio.toISOString()} (${dataInicio.toLocaleString('pt-BR')})`);
@@ -298,22 +281,26 @@ export async function executarSincronizacao() {
     
     const diferencaMinutos = Math.floor((dataFim - dataInicio) / (1000 * 60));
     console.log(`   ⏱️  Janela: ${diferencaMinutos} minutos`);
-    console.log(`   🔄 Buscando dados do dia 21/12/2025`);    
+    console.log(`   🔄 Buscando dados do dia 20/12/2025`);    
     // 2. Limpa cache se necessário
     limparCache();
 
-    // 3. Processa APENAS PEDIDOS (carrinhos desabilitados por performance)
+    // 3. Processa CARRINHOS e PEDIDOS
+    console.log('\n🛒 Processando carrinhos...');
+    const eventosCarrinhos = await processarCarrinhos(dataInicio, dataFim);
+    
     console.log('\n📦 Processando pedidos...');
     const eventosPedidos = await processarPedidos(dataInicio, dataFim);
 
     // Junta todos os eventos
-    const todosEventos = [...eventosPedidos];
+    const todosEventos = [...eventosCarrinhos, ...eventosPedidos];
     totalEventos = todosEventos.length;
 
     if (totalEventos === 0) {
       console.log('\n✅ NENHUM EVENTO NOVO - Sistema atualizado!');
     } else {
       console.log(`\n📊 RESUMO: ${totalEventos} eventos novos encontrados`);
+      console.log(`    Carrinhos: ${eventosCarrinhos.length}`);
       console.log(`    Pedidos: ${eventosPedidos.length}`);
       console.log('\n📤 ENVIANDO PARA GHL...');
 
