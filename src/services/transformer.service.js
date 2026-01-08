@@ -8,13 +8,14 @@
 class TransformerService {
   
   /**
-   * Valida se tem dados de contato mínimos (email OU telefone)
+   * Valida se tem dados de contato mínimos
+   * ⚠️ REGRA: Telefone é OBRIGATÓRIO para envio ao GHL
    */
   validarDadosContato(cliente) {
-    const temEmail = cliente?.email && cliente.email.trim() !== '';
     const temTelefone = cliente?.telefone && cliente.telefone.trim() !== '';
     
-    return temEmail || temTelefone;
+    // Telefone é obrigatório
+    return temTelefone;
   }
 
   /**
@@ -87,14 +88,14 @@ class TransformerService {
 
   /**
    * Transforma carrinho abandonado
-   * Status 4 - Carrinho Abandonado
-   * Dados obrigatórios: pessoa (email/telefone), itens, valor_total
+   * Status 2 - Carrinho Abandonado (conforme openapi.yaml)
+   * Dados obrigatórios: pessoa (telefone OBRIGATÓRIO), itens, valor_total
    */
   transformarCarrinhoAbandonado(carrinho, cliente) {
     const pessoa = this.extrairDadosPessoa(carrinho, cliente);
     
     if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
-      console.log(`⚠️  Carrinho abandonado ${carrinho.id} sem dados de contato - IGNORADO`);
+      console.log(`⚠️  Carrinho abandonado ${carrinho.id} sem telefone - IGNORADO`);
       return null;
     }
 
@@ -102,7 +103,7 @@ class TransformerService {
       tipo_evento: 'carrinho_abandonado',
       carrinho_id: carrinho.id,
       status: {
-        codigo: 4,
+        codigo: 2,
         descricao: 'Carrinho Abandonado',
         data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
       },
@@ -110,7 +111,7 @@ class TransformerService {
       carrinho: {
         carrinho_id: carrinho.id,
         status: 'abandonado',
-        status_codigo: 4,
+        status_codigo: 2,
         valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
         itens: this.transformarItens(carrinho.itens || [])
       },
@@ -127,14 +128,14 @@ class TransformerService {
 
   /**
    * Transforma carrinho em checkout (aguardando pagamento)
-   * Status 2 - Aguardando Pagamento
-   * Dados obrigatórios: pessoa, itens, valor_total, forma_pagamento
+   * Status 3 - Comprado (conforme openapi.yaml: carrinho virou pedido)
+   * Dados obrigatórios: pessoa (telefone OBRIGATÓRIO), itens, valor_total, forma_pagamento
    */
   transformarCarrinhoCheckout(carrinho, cliente) {
     const pessoa = this.extrairDadosPessoa(carrinho, cliente);
     
     if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
-      console.log(`⚠️  Carrinho checkout ${carrinho.id} sem dados de contato - IGNORADO`);
+      console.log(`⚠️  Carrinho checkout ${carrinho.id} sem telefone - IGNORADO`);
       return null;
     }
 
@@ -142,15 +143,15 @@ class TransformerService {
       tipo_evento: 'carrinho_checkout',
       carrinho_id: carrinho.id,
       status: {
-        codigo: 2,
-        descricao: 'Comprou (Aguardando Pagamento)',
+        codigo: 3,
+        descricao: 'Comprado (Aguardando Pagamento)',
         data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
       },
       pessoa,
       carrinho: {
         carrinho_id: carrinho.id,
         status: 'checkout',
-        status_codigo: 2,
+        status_codigo: 3,
         valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
         forma_pagamento: carrinho.forma_pagamento || carrinho.formaPagamento || 'Não informado',
         itens: this.transformarItens(carrinho.itens || [])
@@ -283,19 +284,41 @@ class TransformerService {
 
   /**
    * Retorna descrição do status do pedido
+   * Baseado no openapi.yaml oficial do Magazord
    */
   getStatusDescricao(status) {
     const statusMap = {
-      0: 'Crédito e Cadastro Aprovados',
       1: 'Aguardando Pagamento',
-      2: 'Pagamento em Análise',
-      3: 'Pago',
+      2: 'Cancelado Pagamento',
+      3: 'Em análise Pagamento',
       4: 'Aprovado',
-      5: 'Em Separação',
-      6: 'Enviado',
-      7: 'Entregue',
-      8: 'Cancelado',
-      9: 'Devolvido'
+      5: 'Aprovado e Integrado',
+      6: 'Nota Fiscal Emitida',
+      7: 'Transporte',
+      8: 'Entregue',
+      9: 'Fraude',
+      10: 'Chargeback',
+      11: 'Disputa',
+      12: 'Aprovado Análise de Pagamento',
+      13: 'Em análise de pagamento (interna)',
+      14: 'Cancelado Pagamento Análise',
+      15: 'Aguardando Pagamento (Diferenciado)',
+      16: 'Problema Fluxo Postal',
+      17: 'Devolvido Financeiro',
+      18: 'Aguardando Atualização de Dados',
+      19: 'Aguardando Chegada do Produto',
+      20: 'Devolvido Estoque (Dep. 1)',
+      21: 'Devolvido Estoque (Outros Dep.)',
+      22: 'Suspenso Temporariamente',
+      23: 'Faturamento Iniciado',
+      24: 'Em Cancelamento',
+      25: 'Tratamento Pós-Vendas',
+      26: 'Nota Fiscal Cancelada',
+      27: 'Crédito por Troca',
+      28: 'Nota Fiscal Denegada',
+      29: 'Chargeback Pago',
+      30: 'Aprovado Parcial',
+      31: 'Em Logística Reversa'
     };
     
     return statusMap[status] || `Status ${status}`;

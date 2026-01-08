@@ -63,12 +63,12 @@ async function processarCarrinhos(dataInicio, dataFim) {
 
       // SKIP: Carrinho convertido será processado como pedido
       if (carrinho.status === 3) {
-        console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status 3 - convertido em pedido)`);
+        console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status 3 - Comprado/convertido em pedido)`);
         continue;
       }
 
-      // Processar apenas status relevantes: 1 (aberto), 2 (checkout), 4 (abandonado)
-      if (![1, 2, 4].includes(carrinho.status)) {
+      // Processar apenas status relevantes: 1 (aberto), 2 (abandonado)
+      if (![1, 2].includes(carrinho.status)) {
         console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status ${carrinho.status} - não rastreado)`);
         continue;
       }
@@ -82,28 +82,35 @@ async function processarCarrinhos(dataInicio, dataFim) {
         itens = await magazordService.buscarItensCarrinho(carrinho.id);
         carrinhoCompleto.itens = itens;
         
-        // NOVO: Buscar dados da pessoa se tiver pessoaId (para obter email/telefone)
+        // 📞 BUSCA FORÇADA: SEMPRE buscar dados da pessoa para obter telefone
         if (carrinho.pessoaId) {
           try {
             cliente = await magazordService.buscarPessoa(carrinho.pessoaId);
-            console.log(`   ✅ Dados da pessoa ${carrinho.pessoaId} obtidos - Email: ${cliente?.email || 'N/A'}`);
+            console.log(`   ✅ Dados da pessoa ${carrinho.pessoaId}:`);
+            console.log(`      - Email: ${cliente?.email || 'N/A'}`);
+            console.log(`      - Telefone: ${cliente?.telefone || 'N/A'}`);
           } catch (error) {
             console.log(`   ⚠️ Erro ao buscar pessoa ${carrinho.pessoaId}:`, error.message);
           }
+        }
+        
+        // ⚠️ VALIDAÇÃO: Rejeitar se não tiver telefone
+        const telefone = carrinho.pessoaContato || cliente?.telefone || '';
+        if (!telefone || telefone.trim() === '') {
+          console.log(`   ❌ Carrinho ${carrinho.id} REJEITADO - Sem número de telefone`);
+          continue;
         }
         
       } catch (error) {
         console.log(`   ⚠️ Erro ao buscar dados do carrinho ${carrinho.id}:`, error.message);
       }
 
-      // Processar TODOS os status relevantes (1, 2, 4)
+      // Processar status relevantes (1=Aberto, 2=Abandonado)
       let evento = null;
       
       if (carrinho.status === 1) {
         evento = transformerService.transformarCarrinhoAberto(carrinhoCompleto, cliente);
       } else if (carrinho.status === 2) {
-        evento = transformerService.transformarCarrinhoCheckout(carrinhoCompleto, cliente);
-      } else if (carrinho.status === 4) {
         evento = transformerService.transformarCarrinhoAbandonado(carrinhoCompleto, cliente);
       }
       
@@ -150,26 +157,13 @@ async function processarPedidos(dataInicio, dataFim) {
       return [];
     }
 
-    // 🎯 FILTRO: APENAS PEDIDOS CANCELADOS (status 8) - Economia de requisições GHL
-    const pedidosCancelados = pedidos.filter(p => p.pedidoSituacao === 8);
-    const ignorados = pedidos.length - pedidosCancelados.length;
-    
-    if (ignorados > 0) {
-      console.log(`   ⏭️  ${ignorados} pedidos ignorados (enviando apenas cancelados - status 8)`);
-    }
-    
-    if (pedidosCancelados.length === 0) {
-      console.log('   ✓ Nenhum pedido cancelado (status 8) encontrado');
-      return [];
-    }
-
-    console.log(`   📦 Processando ${pedidosCancelados.length} pedidos cancelados...`);
+    console.log(`   📦 Processando ${pedidos.length} pedidos...`);
     
     const eventos = [];
     
-    // OTIMIZAÇÃO: Buscar emails de TODAS as pessoas de uma vez (paralelo)
-    const pessoasIds = [...new Set(pedidosCancelados.filter(p => p.pessoaId).map(p => p.pessoaId))];
-    console.log(`\n   📧 Buscando emails de ${pessoasIds.length} pessoas em paralelo...`);
+    // OTIMIZAÇÃO: Buscar dados completos de TODAS as pessoas de uma vez (paralelo)
+    const pessoasIds = [...new Set(pedidos.filter(p => p.pessoaId).map(p => p.pessoaId))];
+    console.log(`\n   📧 Buscando dados de ${pessoasIds.length} pessoas em paralelo...`);
     
     const pessoasMap = {};
     const pessoasPromises = pessoasIds.map(async (id) => {
@@ -182,12 +176,12 @@ async function processarPedidos(dataInicio, dataFim) {
     });
     
     await Promise.all(pessoasPromises);
-    console.log(`   ✅ ${Object.keys(pessoasMap).length} emails obtidos`);
+    console.log(`   ✅ ${Object.keys(pessoasMap).length} pessoas com dados completos`);
     
-    // Processar pedidos cancelados com os dados já obtidos
-    for (const pedido of pedidosCancelados) {
+    // Processar TODOS os pedidos com os dados já obtidos
+    for (const pedido of pedidos) {
       console.log(`\n   🔹 Pedido ${pedido.id}:`);
-      console.log(`      - Status: 8 (CANCELADO)`);
+      console.log(`      - Status: ${pedido.pedidoSituacao}`);
       console.log(`      - Nome: ${pedido.pessoaNome}`);
       console.log(`      - Contato: ${pedido.pessoaContato}`);
       
@@ -202,6 +196,14 @@ async function processarPedidos(dataInicio, dataFim) {
       const cliente = pedido.pessoaId ? pessoasMap[pedido.pessoaId] : null;
       if (cliente) {
         console.log(`      ✅ Email: ${cliente.email || 'N/A'}`);
+        console.log(`      ✅ Telefone: ${cliente.telefone || 'N/A'}`);
+      }
+      
+      // ⚠️ VALIDAÇÃO OBRIGATÓRIA: Telefone deve existir
+      const telefone = pedido.pessoaContato || cliente?.telefone || '';
+      if (!telefone || telefone.trim() === '') {
+        console.log(`      ❌ REJEITADO - Sem número de telefone`);
+        continue;
       }
 
       // Montar pedido completo
@@ -271,9 +273,15 @@ export async function executarSincronizacao() {
   let resultados = [];
 
   try {
-    // TEMPORÁRIO: Buscar apenas dia 20/12/2025
-    dataInicio = new Date('2025-12-20T00:00:00-03:00');
-    dataFim = new Date('2025-12-20T23:59:59-03:00');
+    // 📅 FILTRO DE DATA: Apenas pedidos/carrinhos de 08/01/2026 em diante
+    const dataLimite = new Date('2026-01-08T00:00:00-03:00');
+    
+    // Recupera última execução do Supabase (com fallback para dataLimite)
+    const ultimaExecucao = await supabaseService.recuperarUltimaExecucao();
+    dataInicio = ultimaExecucao && new Date(ultimaExecucao) >= dataLimite 
+      ? new Date(ultimaExecucao) 
+      : dataLimite;
+    dataFim = new Date(); // Agora
     
     console.log(`\n📊 PERÍODO DE SINCRONIZAÇÃO:`);
     console.log(`   De: ${dataInicio.toISOString()} (${dataInicio.toLocaleString('pt-BR')})`);
@@ -281,7 +289,7 @@ export async function executarSincronizacao() {
     
     const diferencaMinutos = Math.floor((dataFim - dataInicio) / (1000 * 60));
     console.log(`   ⏱️  Janela: ${diferencaMinutos} minutos`);
-    console.log(`   🔄 Buscando dados do dia 20/12/2025`);    
+    console.log(`   📅 Filtro mínimo: 08/01/2026 00:00`);    
     // 2. Limpa cache se necessário
     limparCache();
 
