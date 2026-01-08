@@ -90,11 +90,12 @@ async function processarCarrinhos(dataInicio, dataFim) {
       let cliente = null;
       let itens = [];
       
-      // 📞 BUSCA FORÇADA DE TELEFONE: SEMPRE buscar dados completos do carrinho
+      // 📞 BUSCA DE DADOS COMPLETOS
+      let carrinhoCompleto = { ...carrinho };
+      let cliente = null;
+      let itens = [];
+      
       try {
-        const carrinhoDetalhado = await magazordService.buscarCarrinhoPorId(carrinho.id);
-        carrinhoCompleto = { ...carrinho, ...carrinhoDetalhado };
-        
         // Buscar itens do carrinho
         itens = await magazordService.buscarItensCarrinho(carrinho.id);
         carrinhoCompleto.itens = itens;
