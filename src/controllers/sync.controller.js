@@ -90,32 +90,43 @@ async function processarCarrinhos(dataInicio, dataFim) {
       let cliente = null;
       let itens = [];
       
+      // 📞 BUSCA FORÇADA DE TELEFONE: SEMPRE buscar dados completos do carrinho
       try {
+        const carrinhoDetalhado = await magazordService.buscarCarrinhoPorId(carrinho.id);
+        carrinhoCompleto = { ...carrinho, ...carrinhoDetalhado };
+        
         // Buscar itens do carrinho
         itens = await magazordService.buscarItensCarrinho(carrinho.id);
         carrinhoCompleto.itens = itens;
         
-        // 📞 BUSCA FORÇADA: SEMPRE buscar dados da pessoa para obter telefone
-        if (carrinho.pessoaId) {
+        console.log(`   🔍 Carrinho ${carrinho.id} - pessoaId: ${carrinhoCompleto.pessoaId || 'NÃO TEM'}`);
+        
+        // SEMPRE buscar pessoa se tiver pessoaId
+        if (carrinhoCompleto.pessoaId) {
           try {
-            cliente = await magazordService.buscarPessoa(carrinho.pessoaId);
-            console.log(`   ✅ Dados da pessoa ${carrinho.pessoaId}:`);
+            cliente = await magazordService.buscarPessoa(carrinhoCompleto.pessoaId);
+            console.log(`   ✅ Pessoa ${carrinhoCompleto.pessoaId} encontrada:`);
             console.log(`      - Email: ${cliente?.email || 'N/A'}`);
             console.log(`      - Telefone: ${cliente?.telefone || 'N/A'}`);
           } catch (error) {
-            console.log(`   ⚠️ Erro ao buscar pessoa ${carrinho.pessoaId}:`, error.message);
+            console.log(`   ⚠️ Erro ao buscar pessoa ${carrinhoCompleto.pessoaId}:`, error.message);
           }
+        } else {
+          console.log(`   ⚠️ Carrinho ${carrinho.id} sem pessoaId - impossível buscar telefone`);
         }
         
-        // ⚠️ VALIDAÇÃO: Rejeitar se não tiver telefone
-        const telefone = carrinho.pessoaContato || cliente?.telefone || '';
+        // Verificar telefone
+        const telefone = carrinhoCompleto.pessoaContato || cliente?.telefone || '';
         if (!telefone || telefone.trim() === '') {
-          console.log(`   ❌ Carrinho ${carrinho.id} REJEITADO - Sem número de telefone`);
+          console.log(`   ❌ Carrinho ${carrinho.id} REJEITADO - Sem telefone mesmo após buscar em /pessoa`);
           continue;
         }
         
+        console.log(`   ✅ Carrinho ${carrinho.id} tem telefone: ${telefone}`);
+        
       } catch (error) {
-        console.log(`   ⚠️ Erro ao buscar dados do carrinho ${carrinho.id}:`, error.message);
+        console.log(`   ❌ Erro ao buscar dados do carrinho ${carrinho.id}:`, error.message);
+        continue;
       }
 
       // Processar status relevantes (1=Aberto, 2=Abandonado)
