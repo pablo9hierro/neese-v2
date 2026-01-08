@@ -86,10 +86,6 @@ async function processarCarrinhos(dataInicio, dataFim) {
         continue;
       }
 
-      let carrinhoCompleto = { ...carrinho };
-      let cliente = null;
-      let itens = [];
-      
       // 📞 BUSCA DE DADOS COMPLETOS
       let carrinhoCompleto = { ...carrinho };
       let cliente = null;
