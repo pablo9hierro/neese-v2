@@ -53,8 +53,21 @@ async function processarCarrinhos(dataInicio, dataFim) {
 
     console.log(`   📦 Encontrados: ${carrinhos.length} carrinhos`);
     
+    // FILTRO: Apenas carrinhos CRIADOS a partir de 08/01/2026
+    const dataLimite = new Date('2026-01-08T00:00:00-03:00');
+    const carrinhosFiltrados = carrinhos.filter(c => {
+      const dataInicio = new Date(c.dataInicio);
+      return dataInicio >= dataLimite;
+    });
+    
+    if (carrinhosFiltrados.length < carrinhos.length) {
+      console.log(`   🗑️  ${carrinhos.length - carrinhosFiltrados.length} carrinhos ignorados (criados antes de 08/01/2026)`);
+    }
+    
+    console.log(`   ✅ ${carrinhosFiltrados.length} carrinhos válidos (criados >= 08/01/2026)`);
+    
     const eventos = [];
-    for (const carrinho of carrinhos) {
+    for (const carrinho of carrinhosFiltrados) {
       const identificador = `CARRINHO-${carrinho.id}-${carrinho.status}`;
       
       if (jaFoiProcessado(identificador)) {

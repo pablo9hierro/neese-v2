@@ -41,8 +41,8 @@ class MagazordService {
       const dataFimFormatada = dataFimBrasilia.toISOString().split('.')[0];
       
       const params = {
-        'dataInicio[gte]': dataInicioFormatada,
-        'dataInicio[lte]': dataFimFormatada,
+        dataAtualizacaoInicio: dataInicioFormatada,
+        dataAtualizacaoFim: dataFimFormatada,
         limit: 100
       };
       
@@ -122,9 +122,9 @@ class MagazordService {
       const dataInicioBrasilia = new Date(dataInicio.getTime() + (offsetBrasilia * 60 * 1000));
       const dataFimBrasilia = new Date(dataFim.getTime() + (offsetBrasilia * 60 * 1000));
       
-      // Formatar datas no padrão ISO sem milissegundos e sem Z
-      const dataInicioStr = dataInicioBrasilia.toISOString().split('.')[0];
-      const dataFimStr = dataFimBrasilia.toISOString().split('.')[0];
+      // Formatar datas no padrão ISO com timezone -03:00 (Y-m-d\\TH:i:sP)
+      const dataInicioStr = dataInicioBrasilia.toISOString().split('.')[0] + '-03:00';
+      const dataFimStr = dataFimBrasilia.toISOString().split('.')[0] + '-03:00';
 
       console.error(`[Magazord] 🔍 Buscando pedidos CRIADOS:`);
       console.error(`   De: ${dataInicioStr}`);
