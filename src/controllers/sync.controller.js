@@ -277,7 +277,7 @@ export async function executarSincronizacao() {
     const dataLimite = new Date('2026-01-08T00:00:00-03:00');
     
     // Recupera última execução do Supabase (com fallback para dataLimite)
-    const ultimaExecucao = await supabaseService.recuperarUltimaExecucao();
+    const ultimaExecucao = await supabaseService.obterUltimaExecucao();
     dataInicio = ultimaExecucao && new Date(ultimaExecucao) >= dataLimite 
       ? new Date(ultimaExecucao) 
       : dataLimite;
