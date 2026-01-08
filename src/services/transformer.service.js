@@ -188,9 +188,34 @@ class TransformerService {
     const temRastreio = rastreamento && (rastreamento.codigo || rastreamento.codigoRastreio);
 
     const statusCodigo = pedido.pedidoSituacao || pedido.status || 0;
+    const formaPagamento = (pedido.formaPagamentoNome || pedido.formaPagamento || pedido.forma_pagamento || '').toLowerCase();
+    
+    // 🎯 DETERMINAR TIPO DE EVENTO ESPECÍFICO
+    let tipoEvento = 'status_atualizado'; // fallback
+    
+    if (statusCodigo === 1) {
+      tipoEvento = 'pedido_aguardando_pagamento';
+    } else if (statusCodigo === 2 || statusCodigo === 14) {
+      // Pagamento cancelado/recusado
+      if (formaPagamento.includes('cartão') || formaPagamento.includes('cartao') || formaPagamento.includes('crédito') || formaPagamento.includes('credito')) {
+        tipoEvento = 'cartao_recusado';
+      } else if (formaPagamento.includes('pix')) {
+        tipoEvento = 'pix_expirado';
+      } else if (formaPagamento.includes('boleto')) {
+        tipoEvento = 'boleto_vencido';
+      } else {
+        tipoEvento = 'pagamento_cancelado';
+      }
+    } else if (statusCodigo === 4) {
+      tipoEvento = 'pedido_aprovado';
+    } else if (statusCodigo === 7) {
+      tipoEvento = 'pedido_em_transporte';
+    } else if (statusCodigo === 8) {
+      tipoEvento = 'pedido_entregue';
+    }
     
     const evento = {
-      tipo_evento: 'status_atualizado',
+      tipo_evento: tipoEvento,
       pedido_id: pedido.id,
       pedido_codigo: pedido.codigo || `PEDIDO-${pedido.id}`,
       status: {

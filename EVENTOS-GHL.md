@@ -36,7 +36,10 @@ Todos os eventos enviados ao GHL contêm os seguintes campos principais:
 **Filtros no GHL:**
 ```
 tipo_evento is carrinho_abandonado
-AND carrinho.status_codigo Equal to 2
+```
+**OU**
+```
+carrinho.status_codigo Equal to 2
 ```
 
 **Campos disponíveis:**
@@ -52,8 +55,11 @@ AND carrinho.status_codigo Equal to 2
 **Quando ocorre:** Pedido é gerado (PIX/boleto) e fica "Aguardando Pagamento"  
 **Filtros no GHL:**
 ```
-tipo_evento is status_atualizado
-AND pedido.status_codigo Equal to 1
+tipo_evento is pedido_aguardando_pagamento
+```
+**OU**
+```
+pedido.status_codigo Equal to 1
 ```
 
 **Descrição do status:** "Aguardando Pagamento"
@@ -69,22 +75,19 @@ AND pedido.status_codigo Equal to 1
 
 ---
 
-### 3️⃣ **PIX Expirado / Boleto Vencido (Cancelado por Falta de Pagamento)**
-**Quando ocorre:** PIX expira ou boleto vence e o pedido fica "Expirado/Cancelado por falta de pagamento"  
+### 3️⃣ **PIX Expirado**
+**Quando ocorre:** PIX expira e o pedido é cancelado  
 **Filtros no GHL:**
 ```
-tipo_evento is status_atualizado
-AND pedido.status_codigo Equal to 2
+tipo_evento is pix_expirado
 ```
 **OU**
 ```
-tipo_evento is status_atualizado
-AND pedido.status_codigo Equal to 14
+pedido.status_codigo Equal to 2
+AND pedido.forma_pagamento Contains "Pix"
 ```
 
-**Descrições dos status:**
-- Status 2: "Cancelado Pagamento"
-- Status 14: "Cancelado Pagamento Análise"
+**Descrição do status:** "Cancelado Pagamento"
 
 **Campos disponíveis:**
 - `pessoa.telefone` ✅ (obrigatório)
@@ -95,24 +98,42 @@ AND pedido.status_codigo Equal to 14
 
 ---
 
-### 4️⃣ **Cartão Recusado**
-**Quando ocorre:** Tentativa de pagamento com cartão falha/recusada  
+### 4️⃣ **Boleto Vencido**
+**Quando ocorre:** Boleto vence e o pedido é cancelado  
 **Filtros no GHL:**
 ```
-tipo_evento is status_atualizado
-AND pedido.status_codigo Equal to 2
-AND pedido.forma_pagamento Contains "Cartão"
+tipo_evento is boleto_vencido
 ```
 **OU**
 ```
-tipo_evento is status_atualizado
-AND pedido.status_codigo Equal to 14
+pedido.status_codigo Equal to 2
+AND pedido.forma_pagamento Contains "Boleto"
+```
+
+**Descrição do status:** "Cancelado Pagamento"
+
+**Campos disponíveis:**
+- `pessoa.telefone` ✅ (obrigatório)
+- `pessoa.email`
+- `pessoa.nome`
+- `pedido.valor_total`
+- `pedido.forma_pagamento`
+
+---
+
+### 5️⃣ **Cartão Recusado**
+**Quando ocorre:** Tentativa de pagamento com cartão falha/recusada  
+**Filtros no GHL:**
+```
+tipo_evento is cartao_recusado
+```
+**OU**
+```
+pedido.status_codigo Equal to 2
 AND pedido.forma_pagamento Contains "Cartão"
 ```
 
-**Descrições dos status:**
-- Status 2: "Cancelado Pagamento"
-- Status 14: "Cancelado Pagamento Análise"
+**Descrição do status:** "Cancelado Pagamento"
 
 **Campos disponíveis:**
 - `pessoa.telefone` ✅ (obrigatório)
