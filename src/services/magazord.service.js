@@ -41,16 +41,16 @@ class MagazordService {
       const dataFimFormatada = dataFimBrasilia.toISOString().split('.')[0];
       
       const params = {
-        dataAtualizacaoInicio: dataInicioFormatada,
-        dataAtualizacaoFim: dataFimFormatada,
-        limit: 2
+        'dataInicio[gte]': dataInicioFormatada,
+        'dataInicio[lte]': dataFimFormatada,
+        limit: 100
       };
       
       if (status) {
         params.status = status;
       }
       
-      console.log(`[Magazord] Buscando carrinhos de ${dataInicioFormatada} até ${dataFimFormatada}`);
+      console.log(`[Magazord] Buscando carrinhos CRIADOS de ${dataInicioFormatada} até ${dataFimFormatada}`);
       
       const response = await axios.get(`${this.apiUrl}/v2/site/carrinho`, {
         auth: this.auth,
@@ -126,15 +126,15 @@ class MagazordService {
       const dataInicioStr = dataInicioBrasilia.toISOString().split('.')[0];
       const dataFimStr = dataFimBrasilia.toISOString().split('.')[0];
 
-      console.error(`[Magazord] 🔍 Buscando pedidos:`);
+      console.error(`[Magazord] 🔍 Buscando pedidos CRIADOS:`);
       console.error(`   De: ${dataInicioStr}`);
       console.error(`   Até: ${dataFimStr}`);
 
       const response = await axios.get(`${this.apiUrl}/v2/site/pedido`, {
         auth: this.auth,
         params: {
-          dataAtualizacaoInicio: dataInicioStr,
-          dataAtualizacaoFim: dataFimStr,
+          'dataHora[gte]': dataInicioStr,
+          'dataHora[lte]': dataFimStr,
           limit: 100
         }
       });
