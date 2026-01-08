@@ -273,23 +273,13 @@ export async function executarSincronizacao() {
   let resultados = [];
 
   try {
-    // 📅 FILTRO DE DATA: Apenas pedidos/carrinhos de 08/01/2026 em diante
-    const dataLimite = new Date('2026-01-08T00:00:00-03:00');
-    
-    // Recupera última execução do Supabase (com fallback para dataLimite)
-    const ultimaExecucao = await supabaseService.obterUltimaExecucao();
-    dataInicio = ultimaExecucao && new Date(ultimaExecucao) >= dataLimite 
-      ? new Date(ultimaExecucao) 
-      : dataLimite;
-    dataFim = new Date(); // Agora
+    // 📅 SEMPRE 08/01/2026 em diante
+    dataInicio = new Date('2026-01-08T00:00:00-03:00');
+    dataFim = new Date();
     
     console.log(`\n📊 PERÍODO DE SINCRONIZAÇÃO:`);
-    console.log(`   De: ${dataInicio.toISOString()} (${dataInicio.toLocaleString('pt-BR')})`);
-    console.log(`   Até: ${dataFim.toISOString()} (${dataFim.toLocaleString('pt-BR')})`);
-    
-    const diferencaMinutos = Math.floor((dataFim - dataInicio) / (1000 * 60));
-    console.log(`   ⏱️  Janela: ${diferencaMinutos} minutos`);
-    console.log(`   📅 Filtro mínimo: 08/01/2026 00:00`);    
+    console.log(`   De: ${dataInicio.toISOString()}`)
+    console.log(`   Até: ${dataFim.toISOString()}`);    
     // 2. Limpa cache se necessário
     limparCache();
 
