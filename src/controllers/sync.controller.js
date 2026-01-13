@@ -66,65 +66,79 @@ async function processarCarrinhos(dataInicio, dataFim) {
     
     console.log(`   ✅ ${carrinhosFiltrados.length} carrinhos válidos (criados >= 08/01/2026)`);
     
+    // FILTRAR apenas carrinhos relevantes antes de processar
+    const carrinhosRelevantes = carrinhosFiltrados.filter(c => [1, 2].includes(c.status));
+    console.log(`   ✅ ${carrinhosRelevantes.length} carrinhos com status relevante (1=Aberto, 2=Abandonado)`);
+    
+    if (carrinhosRelevantes.length === 0) {
+      console.log('   ✓ Nenhum carrinho para processar');
+      return [];
+    }
+    
+    // OTIMIZAÇÃO: Buscar TODAS as pessoas em paralelo (igual aos pedidos)
+    const pessoasIds = [...new Set(carrinhosRelevantes.filter(c => c.pessoaId).map(c => c.pessoaId))];
+    console.log(`\n   📧 Buscando dados de ${pessoasIds.length} pessoas em paralelo...`);
+    
+    const pessoasMap = {};
+    const pessoasPromises = pessoasIds.map(async (id) => {
+      try {
+        const pessoa = await magazordService.buscarPessoa(id);
+        if (pessoa) pessoasMap[id] = pessoa;
+      } catch (err) {
+        console.log(`      ⚠️ Erro ao buscar pessoa ${id}: ${err.message}`);
+      }
+    });
+    
+    await Promise.all(pessoasPromises);
+    console.log(`   ✅ ${Object.keys(pessoasMap).length} pessoas com dados completos\n`);
+    
+    // OTIMIZAÇÃO: Buscar TODOS os itens em paralelo
+    const itensMap = {};
+    const itensPromises = carrinhosRelevantes.map(async (carrinho) => {
+      try {
+        const itens = await magazordService.buscarItensCarrinho(carrinho.id);
+        itensMap[carrinho.id] = itens || [];
+      } catch (err) {
+        console.log(`      ⚠️ Erro ao buscar itens do carrinho ${carrinho.id}: ${err.message}`);
+        itensMap[carrinho.id] = [];
+      }
+    });
+    
+    await Promise.all(itensPromises);
+    console.log(`   ✅ Itens buscados para ${Object.keys(itensMap).length} carrinhos\n`);
+    
     const eventos = [];
-    for (const carrinho of carrinhosFiltrados) {
+    for (const carrinho of carrinhosRelevantes) {
       const identificador = `CARRINHO-${carrinho.id}-${carrinho.status}`;
       
       if (jaFoiProcessado(identificador)) {
         continue;
       }
 
-      // SKIP: Carrinho convertido será processado como pedido
-      if (carrinho.status === 3) {
-        console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status 3 - Comprado/convertido em pedido)`);
-        continue;
-      }
-
-      // Processar apenas status relevantes: 1 (aberto), 2 (abandonado)
-      if (![1, 2].includes(carrinho.status)) {
-        console.log(`   ⏭️  Pulando carrinho ${carrinho.id} (status ${carrinho.status} - não rastreado)`);
-        continue;
-      }
-
-      // 📞 BUSCA DE DADOS COMPLETOS
-      let carrinhoCompleto = { ...carrinho };
-      let cliente = null;
-      let itens = [];
+      // Montar carrinho completo com dados já obtidos (sem novas requisições!)
+      const cliente = carrinho.pessoaId ? pessoasMap[carrinho.pessoaId] : null;
+      const itens = itensMap[carrinho.id] || [];
       
-      try {
-        // Buscar itens do carrinho
-        itens = await magazordService.buscarItensCarrinho(carrinho.id);
-        carrinhoCompleto.itens = itens;
-        
-        console.log(`   🔍 Carrinho ${carrinho.id} - pessoaId: ${carrinhoCompleto.pessoaId || 'NÃO TEM'}`);
-        
-        // SEMPRE buscar pessoa se tiver pessoaId
-        if (carrinhoCompleto.pessoaId) {
-          try {
-            cliente = await magazordService.buscarPessoa(carrinhoCompleto.pessoaId);
-            console.log(`   ✅ Pessoa ${carrinhoCompleto.pessoaId} encontrada:`);
-            console.log(`      - Email: ${cliente?.email || 'N/A'}`);
-            console.log(`      - Telefone: ${cliente?.telefone || 'N/A'}`);
-          } catch (error) {
-            console.log(`   ⚠️ Erro ao buscar pessoa ${carrinhoCompleto.pessoaId}:`, error.message);
-          }
-        } else {
-          console.log(`   ⚠️ Carrinho ${carrinho.id} sem pessoaId - impossível buscar telefone`);
-        }
-        
-        // Verificar telefone
-        const telefone = carrinhoCompleto.pessoaContato || cliente?.telefone || '';
-        if (!telefone || telefone.trim() === '') {
-          console.log(`   ❌ Carrinho ${carrinho.id} REJEITADO - Sem telefone mesmo após buscar em /pessoa`);
-          continue;
-        }
-        
-        console.log(`   ✅ Carrinho ${carrinho.id} tem telefone: ${telefone}`);
-        
-      } catch (error) {
-        console.log(`   ❌ Erro ao buscar dados do carrinho ${carrinho.id}:`, error.message);
+      const carrinhoCompleto = {
+        ...carrinho,
+        itens
+      };
+      
+      console.log(`   🔍 Carrinho ${carrinho.id} - pessoaId: ${carrinho.pessoaId || 'NÃO TEM'}`);
+      
+      if (cliente) {
+        console.log(`      - Email: ${cliente.email || 'N/A'}`);
+        console.log(`      - Telefone: ${cliente.telefone || 'N/A'}`);
+      }
+      
+      // Verificar telefone
+      const telefone = carrinhoCompleto.pessoaContato || cliente?.telefone || '';
+      if (!telefone || telefone.trim() === '') {
+        console.log(`   ❌ Carrinho ${carrinho.id} REJEITADO - Sem telefone`);
         continue;
       }
+      
+      console.log(`   ✅ Carrinho ${carrinho.id} tem telefone: ${telefone}`);
 
       // Processar status relevantes (1=Aberto, 2=Abandonado)
       let evento = null;
