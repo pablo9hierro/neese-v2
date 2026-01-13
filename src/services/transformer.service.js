@@ -8,6 +8,48 @@
 class TransformerService {
   
   /**
+   * Formata número de telefone para o padrão GHL
+   * Formato: código país (55) + DDD + 9 + número
+   * Exemplo: 5583987516699
+   */
+  formatarTelefone(telefone) {
+    if (!telefone) return '';
+    
+    // Remove todos os caracteres não numéricos
+    let numeroLimpo = telefone.replace(/\D/g, '');
+    
+    // Se já tem 55 no início, retorna como está
+    if (numeroLimpo.startsWith('55') && numeroLimpo.length === 13) {
+      return numeroLimpo;
+    }
+    
+    // Se começa com 0, remove o 0 inicial
+    if (numeroLimpo.startsWith('0')) {
+      numeroLimpo = numeroLimpo.substring(1);
+    }
+    
+    // Se tem 11 dígitos (DDD + 9 + número), adiciona código do país
+    if (numeroLimpo.length === 11) {
+      return '55' + numeroLimpo;
+    }
+    
+    // Se tem 10 dígitos (DDD + número sem o 9), adiciona o 9
+    if (numeroLimpo.length === 10) {
+      const ddd = numeroLimpo.substring(0, 2);
+      const numero = numeroLimpo.substring(2);
+      return '55' + ddd + '9' + numero;
+    }
+    
+    // Se já tem 13 dígitos mas não começa com 55, assume que precisa do código do país
+    if (numeroLimpo.length === 11) {
+      return '55' + numeroLimpo;
+    }
+    
+    // Retorna como está se não se encaixar nos padrões acima
+    return numeroLimpo;
+  }
+  
+  /**
    * Valida se tem dados de contato mínimos
    * ⚠️ REGRA: Telefone é OBRIGATÓRIO para envio ao GHL
    */
@@ -33,7 +75,8 @@ class TransformerService {
     
     // Priorizar dados do clienteAPI (email completo da API /pessoa/{id})
     const email = (clienteAPI?.email || dados.pessoaEmail || dados.email || '').trim();
-    const telefone = (dados.pessoaContato || clienteAPI?.telefone || dados.telefone || '').trim();
+    const telefoneRaw = (dados.pessoaContato || clienteAPI?.telefone || dados.telefone || '').trim();
+    const telefone = this.formatarTelefone(telefoneRaw);
     const nome = (clienteAPI?.nome || dados.pessoaNome || dados.nome || 'Cliente').trim();
     
     console.log(`      📧 DEBUG pessoa extraída:`, JSON.stringify({ nome, email, telefone }));
