@@ -89,47 +89,6 @@ class TransformerService {
   }
 
   /**
-   * Transforma carrinho aberto para formato GHL
-   * Status 1 - Carrinho Aberto
-   * Dados obrigatórios: pessoa (email/telefone), itens, valor_total
-   */
-  transformarCarrinhoAberto(carrinho, cliente) {
-    const pessoa = this.extrairDadosPessoa(carrinho, cliente);
-    
-    // VALIDAÇÃO OBRIGATÓRIA: Não envia se não tiver contato
-    if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
-      console.log(`⚠️  Carrinho ${carrinho.id} sem dados de contato - IGNORADO`);
-      return null;
-    }
-
-    return {
-      tipo_evento: 'carrinho_aberto',
-      carrinho_id: carrinho.id,
-      status: {
-        codigo: 1,
-        descricao: 'Carrinho Aberto',
-        data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
-      },
-      pessoa,
-      carrinho: {
-        carrinho_id: carrinho.id,
-        status: 'aberto',
-        status_codigo: 1,
-        valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
-        itens: this.transformarItens(carrinho.itens || [])
-      },
-      pedido: {
-        status_codigo: 0
-      },
-      origem: {
-        fonte: 'magazord',
-        capturado_em: new Date().toISOString(),
-        identificador_unico: `CART-${carrinho.id}-${Date.now()}`
-      }
-    };
-  }
-
-  /**
    * Transforma carrinho abandonado
    * Status 2 - Carrinho Abandonado (conforme openapi.yaml)
    * Dados obrigatórios: pessoa (telefone OBRIGATÓRIO), itens, valor_total
@@ -170,53 +129,8 @@ class TransformerService {
   }
 
   /**
-   * Transforma carrinho em checkout (aguardando pagamento)
-   * Status 3 - Comprado (conforme openapi.yaml: carrinho virou pedido)
-   * Dados obrigatórios: pessoa (telefone OBRIGATÓRIO), itens, valor_total, forma_pagamento
-   */
-  transformarCarrinhoCheckout(carrinho, cliente) {
-    const pessoa = this.extrairDadosPessoa(carrinho, cliente);
-    
-    if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
-      console.log(`⚠️  Carrinho checkout ${carrinho.id} sem telefone - IGNORADO`);
-      return null;
-    }
-
-    return {
-      tipo_evento: 'carrinho_checkout',
-      carrinho_id: carrinho.id,
-      status: {
-        codigo: 3,
-        descricao: 'Comprado (Aguardando Pagamento)',
-        data_atualizacao: carrinho.dataAtualizacao || carrinho.data_atualizacao || new Date().toISOString()
-      },
-      pessoa,
-      carrinho: {
-        carrinho_id: carrinho.id,
-        status: 'checkout',
-        status_codigo: 3,
-        valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
-        forma_pagamento: carrinho.forma_pagamento || carrinho.formaPagamento || 'Não informado',
-        itens: this.transformarItens(carrinho.itens || [])
-      },
-      pedido: {
-        status_codigo: 1,
-        valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
-        forma_pagamento: carrinho.forma_pagamento || carrinho.formaPagamento || 'Não informado',
-        itens: this.transformarItens(carrinho.itens || [])
-      },
-      origem: {
-        fonte: 'magazord',
-        capturado_em: new Date().toISOString(),
-        identificador_unico: `CART-CHECKOUT-${carrinho.id}-${Date.now()}`
-      }
-    };
-  }
-
-  /**
    * Transforma pedido completo
-   * Dados obrigatórios: pessoa, pedido completo
-   * Dados condicionais: entrega (só quando tem rastreio)
+   * Apenas status usados no GHL: 1 (Aguardando Pagamento), 2/14 (Cancelados)
    */
   transformarPedido(pedido, carrinho = null, rastreamento = null) {
     // Extrai pessoa do pedido ou carrinho (usando clienteAPI se disponível)
@@ -227,19 +141,23 @@ class TransformerService {
       return null;
     }
 
-    const statusDescricao = this.getStatusDescricao(pedido.status);
-    const temRastreio = rastreamento && (rastreamento.codigo || rastreamento.codigoRastreio);
-
     const statusCodigo = pedido.pedidoSituacao || pedido.status || 0;
     const formaPagamento = (pedido.formaPagamentoNome || pedido.formaPagamento || pedido.forma_pagamento || '').toLowerCase();
     
-    // 🎯 DETERMINAR TIPO DE EVENTO ESPECÍFICO
-    let tipoEvento = 'status_atualizado'; // fallback
+    // 🎯 FILTRAR: Processar APENAS eventos usados no GHL
+    // Status permitidos: 1 (Aguardando Pagamento), 2 e 14 (Cancelados)
+    const statusPermitidos = [1, 2, 14];
+    if (!statusPermitidos.includes(statusCodigo)) {
+      console.log(`      ⏭️  Status ${statusCodigo} ignorado - não usado no GHL`);
+      return null; // Não processa outros status
+    }
+    
+    let tipoEvento = null;
     
     if (statusCodigo === 1) {
       tipoEvento = 'pedido_aguardando_pagamento';
     } else if (statusCodigo === 2 || statusCodigo === 14) {
-      // Pagamento cancelado/recusado
+      // Pagamento cancelado/recusado - identificar tipo específico
       if (formaPagamento.includes('cartão') || formaPagamento.includes('cartao') || formaPagamento.includes('crédito') || formaPagamento.includes('credito')) {
         tipoEvento = 'cartao_recusado';
       } else if (formaPagamento.includes('pix')) {
@@ -247,14 +165,10 @@ class TransformerService {
       } else if (formaPagamento.includes('boleto')) {
         tipoEvento = 'boleto_vencido';
       } else {
-        tipoEvento = 'pagamento_cancelado';
+        // Cancelamento sem forma de pagamento conhecida - ignorar
+        console.log(`      ⏭️  Cancelamento sem forma de pagamento específica - ignorado`);
+        return null;
       }
-    } else if (statusCodigo === 4) {
-      tipoEvento = 'pedido_aprovado';
-    } else if (statusCodigo === 7) {
-      tipoEvento = 'pedido_em_transporte';
-    } else if (statusCodigo === 8) {
-      tipoEvento = 'pedido_entregue';
     }
     
     const evento = {
@@ -284,32 +198,6 @@ class TransformerService {
         identificador_unico: `MGZ-PEDIDO-${pedido.id}`
       }
     };
-
-    // Adiciona dados de entrega APENAS se tiver rastreio
-    if (temRastreio) {
-      evento.entrega = {
-        status: 'rastreavel',
-        codigo_rastreio: rastreamento.codigoRastreio || rastreamento.codigo || '',
-        transportadora: rastreamento.transportadora || '',
-        link_rastreio: rastreamento.linkRastreio || rastreamento.link || '',
-        previsao_entrega: rastreamento.previsaoEntrega || '',
-        data_postagem: rastreamento.dataPostagem || '',
-        endereco_entrega: pedido.enderecoEntrega || null,
-        eventos: rastreamento.eventos || []
-      };
-    } else {
-      // Sem rastreio - apenas indica que não está disponível ainda
-      evento.entrega = {
-        status: 'aguardando',
-        codigo_rastreio: '',
-        transportadora: '',
-        link_rastreio: '',
-        previsao_entrega: '',
-        data_postagem: '',
-        endereco_entrega: null,
-        eventos: []
-      };
-    }
 
     return evento;
   }

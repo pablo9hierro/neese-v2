@@ -66,9 +66,9 @@ async function processarCarrinhos(dataInicio, dataFim) {
     
     console.log(`   ✅ ${carrinhosFiltrados.length} carrinhos válidos (criados >= 08/01/2026)`);
     
-    // FILTRAR apenas carrinhos relevantes antes de processar
-    const carrinhosRelevantes = carrinhosFiltrados.filter(c => [1, 2].includes(c.status));
-    console.log(`   ✅ ${carrinhosRelevantes.length} carrinhos com status relevante (1=Aberto, 2=Abandonado)`);
+    // FILTRAR apenas carrinhos ABANDONADOS (status 2) - eventos usados no GHL
+    const carrinhosRelevantes = carrinhosFiltrados.filter(c => c.status === 2);
+    console.log(`   ✅ ${carrinhosRelevantes.length} carrinhos abandonados (status 2) para processar`);
     
     if (carrinhosRelevantes.length === 0) {
       console.log('   ✓ Nenhum carrinho para processar');
@@ -140,12 +140,10 @@ async function processarCarrinhos(dataInicio, dataFim) {
       
       console.log(`   ✅ Carrinho ${carrinho.id} tem telefone: ${telefone}`);
 
-      // Processar status relevantes (1=Aberto, 2=Abandonado)
+      // Processar apenas carrinho abandonado (status 2)
       let evento = null;
       
-      if (carrinho.status === 1) {
-        evento = transformerService.transformarCarrinhoAberto(carrinhoCompleto, cliente);
-      } else if (carrinho.status === 2) {
+      if (carrinho.status === 2) {
         evento = transformerService.transformarCarrinhoAbandonado(carrinhoCompleto, cliente);
       }
       
@@ -248,24 +246,16 @@ async function processarPedidos(dataInicio, dataFim) {
       };
       
       console.log(`      🔄 Transformando pedido...`);
-      // Rastreamento: opcional, só busca se realmente necessário (pedido enviado)
-      let rastreamento = null;
-      if (pedido.pedidoSituacao >= 6) {
-        try {
-          rastreamento = await magazordService.buscarRastreamento(pedido.id);
-        } catch (err) {
-          console.log(`      ⚠️ Rastreamento não encontrado`);
-        }
-      }
       
-      const evento = transformerService.transformarPedido(pedidoCompleto, null, rastreamento);
+      // Transformar pedido (apenas status usados no GHL)
+      const evento = transformerService.transformarPedido(pedidoCompleto, null, null);
       
       if (!evento) {
-        console.log(`      ❌ Rejeitado (sem dados obrigatórios)`);
+        console.log(`      ❌ Rejeitado (status não usado no GHL ou sem dados obrigatórios)`);
         continue;
       }
       
-      console.log(`      ✅ Evento criado!`);
+      console.log(`      ✅ Evento criado: ${evento.tipo_evento}`);
       
       // Tenta registrar no Supabase (evita duplicatas)
       const isNovo = await supabaseService.registrarEvento(
