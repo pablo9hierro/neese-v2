@@ -54,7 +54,7 @@ class TransformerService {
    * ⚠️ REGRA: Telefone é OBRIGATÓRIO para envio ao GHL
    */
   validarDadosContato(cliente) {
-    const temTelefone = cliente?.telefone && cliente.telefone.trim() !== '';
+    const temTelefone = cliente?.phone && cliente.phone.trim() !== '';
     
     // Telefone é obrigatório
     return temTelefone;
@@ -84,7 +84,7 @@ class TransformerService {
     return {
       nome,
       email,
-      telefone
+      phone: telefone
     };
   }
 
@@ -96,7 +96,7 @@ class TransformerService {
   transformarCarrinhoAbandonado(carrinho, cliente) {
     const pessoa = this.extrairDadosPessoa(carrinho, cliente);
     
-    if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
+    if (!this.validarDadosContato({ email: pessoa.email, phone: pessoa.phone })) {
       console.log(`⚠️  Carrinho abandonado ${carrinho.id} sem telefone - IGNORADO`);
       return null;
     }
@@ -136,7 +136,7 @@ class TransformerService {
     // Extrai pessoa do pedido ou carrinho (usando clienteAPI se disponível)
     const pessoa = this.extrairDadosPessoa(pedido, pedido.clienteAPI);
     
-    if (!this.validarDadosContato({ email: pessoa.email, telefone: pessoa.telefone })) {
+    if (!this.validarDadosContato({ email: pessoa.email, phone: pessoa.phone })) {
       console.log(`⚠️  Pedido ${pedido.id} sem dados de contato - IGNORADO`);
       return null;
     }
