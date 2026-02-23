@@ -97,10 +97,10 @@ async function processarCarrinhos(dataInicio, dataFim) {
     const itensPromises = carrinhosRelevantes.map(async (carrinho) => {
       try {
         const itens = await magazordService.buscarItensCarrinho(carrinho.id);
-        itensMap[carrinho.id] = itens || [];
+        itensMap[carrinho.id] = itens || {};
       } catch (err) {
         console.log(`      ⚠️ Erro ao buscar itens do carrinho ${carrinho.id}: ${err.message}`);
-        itensMap[carrinho.id] = [];
+        itensMap[carrinho.id] = {};
       }
     });
     
@@ -117,28 +117,57 @@ async function processarCarrinhos(dataInicio, dataFim) {
 
       // Montar carrinho completo com dados já obtidos (sem novas requisições!)
       const cliente = carrinho.pessoaId ? pessoasMap[carrinho.pessoaId] : null;
-      const itens = itensMap[carrinho.id] || [];
+      const itensResponse = itensMap[carrinho.id] || {};
+      const linkCheckout = transformerService.extrairLinkCheckoutCarrinho(itensResponse);
+      
+      // 🆕 EXTRAIR DADOS DE PESSOA DO ITENS RESPONSE
+      // Endpoint /v2/site/carrinho/{id}/itens retorna pessoa.contato_principal
+      const pessoaCarrinho = itensResponse.carrinho?.pessoa || null;
+      const draft = itensResponse.carrinho?.draft || carrinho.draft || null;
       
       const carrinhoCompleto = {
         ...carrinho,
-        itens
+        itens: itensResponse.carrinho?.itens || [],
+        linkCheckout: linkCheckout,
+        pessoaCarrinho: pessoaCarrinho,
+        draft: draft
       };
       
       console.log(`   🔍 Carrinho ${carrinho.id} - pessoaId: ${carrinho.pessoaId || 'NÃO TEM'}`);
       
       if (cliente) {
-        console.log(`      - Email: ${cliente.email || 'N/A'}`);
-        console.log(`      - Telefone: ${cliente.telefone || 'N/A'}`);
+        console.log(`      - Email (API pessoa): ${cliente.email || 'N/A'}`);
+        console.log(`      - Telefone (API pessoa): ${cliente.telefone || 'N/A'}`);
       }
       
-      // Verificar telefone
-      const telefone = carrinhoCompleto.pessoaContato || cliente?.telefone || '';
+      if (pessoaCarrinho) {
+        console.log(`      - Email (carrinho): ${pessoaCarrinho.email || 'N/A'}`);
+        console.log(`      - Telefone (carrinho): ${pessoaCarrinho.contato_principal || 'N/A'}`);
+      }
+      
+      if (draft) {
+        const emailDraft = draft.email || draft['pessoa-fisica']?.email || draft['pessoa-juridica']?.email;
+        const telefoneDraft = draft['pessoa-fisica']?.celular || draft['pessoa-fisica']?.telefone || draft['pessoa-juridica']?.celular || draft['pessoa-juridica']?.telefone;
+        console.log(`      - Email (draft): ${emailDraft || 'N/A'}`);
+        console.log(`      - Telefone (draft): ${telefoneDraft || 'N/A'}`);
+      }
+      
+      // Verificar telefone (prioridade: pessoa do carrinho > cliente da API > draft)
+      const telefone = pessoaCarrinho?.contato_principal || 
+                      cliente?.telefone || 
+                      draft?.['pessoa-fisica']?.celular || 
+                      draft?.['pessoa-fisica']?.telefone ||
+                      draft?.['pessoa-juridica']?.celular ||
+                      draft?.['pessoa-juridica']?.telefone || 
+                      '';
+      
       if (!telefone || telefone.trim() === '') {
         console.log(`   ❌ Carrinho ${carrinho.id} REJEITADO - Sem telefone`);
         continue;
       }
       
       console.log(`   ✅ Carrinho ${carrinho.id} tem telefone: ${telefone}`);
+      console.log(`   🔗 Link checkout: ${linkCheckout || '❌ NÃO TEM'}`);
 
       // Processar apenas carrinho abandonado (status 2)
       let evento = null;
@@ -214,6 +243,7 @@ async function processarPedidos(dataInicio, dataFim) {
     // Processar TODOS os pedidos com os dados já obtidos
     for (const pedido of pedidos) {
       console.log(`\n   🔹 Pedido ${pedido.id}:`);
+      console.log(`      - Código: ${pedido.codigo}`);
       console.log(`      - Status: ${pedido.pedidoSituacao}`);
       console.log(`      - Nome: ${pedido.pessoaNome}`);
       console.log(`      - Contato: ${pedido.pessoaContato}`);
@@ -239,10 +269,24 @@ async function processarPedidos(dataInicio, dataFim) {
         continue;
       }
 
+      // 🆕 BUSCAR PAGAMENTO (para obter link)
+      let linkPagamento = null;
+      
+      if (pedido.pedidoSituacao === 1 || pedido.pedidoSituacao === 2 || pedido.pedidoSituacao === 14) {
+        console.log(`      💳 Buscando pagamento...`);
+        const payment = await magazordService.buscarPagamentoPedido(pedido.codigo);
+        
+        if (payment) {
+          linkPagamento = transformerService.extrairLinkPagamento(payment);
+          console.log(`      ✅ Link pagamento: ${linkPagamento ? 'TEM' : 'NÃO TEM'}`);
+        }
+      }
+
       // Montar pedido completo
       const pedidoCompleto = {
         ...pedido,
-        clienteAPI: cliente
+        clienteAPI: cliente,
+        linkPagamento: linkPagamento
       };
       
       console.log(`      🔄 Transformando pedido...`);
@@ -298,8 +342,8 @@ export async function executarSincronizacao() {
   let resultados = [];
 
   try {
-    // 📅 SEMPRE 08/01/2026 em diante
-    dataInicio = new Date('2026-01-08T00:00:00-03:00');
+    // 📅 A partir de 23/02/2026 às 09:00 AM
+    dataInicio = new Date('2026-02-23T09:00:00-03:00');
     dataFim = new Date();
     
     console.log(`\n📊 PERÍODO DE SINCRONIZAÇÃO:`);

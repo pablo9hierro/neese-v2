@@ -211,6 +211,25 @@ class MagazordService {
   async buscarCliente(clienteId) {
     return this.buscarPessoa(clienteId);
   }
+
+  /**
+   * Busca informações de pagamento do pedido
+   * Endpoint: GET /v2/site/pedido/{codigoPedido}/payments
+   */
+  async buscarPagamentoPedido(pedidoCodigo) {
+    try {
+      const response = await axios.get(
+        `${this.apiUrl}/v2/site/pedido/${pedidoCodigo}/payments`,
+        { auth: this.auth }
+      );
+      
+      const payments = response.data?.data?.items || [];
+      return payments.length > 0 ? payments[0] : null;
+    } catch (error) {
+      console.error(`Erro ao buscar pagamento do pedido ${pedidoCodigo}:`, error.response?.data || error.message);
+      return null;
+    }
+  }
 }
 
 export default new MagazordService();

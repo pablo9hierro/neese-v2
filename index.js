@@ -1,6 +1,7 @@
 import express from 'express';
 import cronRouter from './src/routes/cron.route.js';
 import webhookRouter from './src/routes/webhook.route.js';
+import limpezaRouter from './src/routes/limpeza.route.js';
 import config from './src/config/index.js';
 
 const app = express();
@@ -18,6 +19,7 @@ app.use((req, res, next) => {
 // Rotas
 app.use('/api/cron', cronRouter);
 app.use('/api/webhook', webhookRouter);
+app.use('/api/limpeza', limpezaRouter);
 
 // Rota raiz
 app.get('/', (req, res) => {
@@ -28,6 +30,7 @@ app.get('/', (req, res) => {
     endpoints: {
       cron: '/api/cron (GET - executado automaticamente a cada 20 minutos)',
       cronManual: '/api/cron/manual (POST - executar manualmente)',
+      limpeza: '/api/limpeza (GET - executado automaticamente a cada 2 dias)',
       webhook: '/api/webhook/magazord (POST - receber webhooks do Magazord)',
       health: '/api/webhook/health (GET - verificar status)'
     },

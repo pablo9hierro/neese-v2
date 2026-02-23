@@ -14,5 +14,15 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/limpeza",
+      "schedule": "0 3 */2 * *"
+    }
+  ]
 }

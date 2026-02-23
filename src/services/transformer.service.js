@@ -73,11 +73,44 @@ class TransformerService {
       }));
     }
     
-    // Priorizar dados do clienteAPI (email completo da API /pessoa/{id})
-    const email = (clienteAPI?.email || dados.pessoaEmail || dados.email || '').trim();
-    const telefoneRaw = (dados.pessoaContato || clienteAPI?.telefone || dados.telefone || '').trim();
+    // 🆕 Extrair dados de pessoaCarrinho (vem de /v2/site/carrinho/{id}/itens)
+    const pessoaCarrinho = dados.pessoaCarrinho || null;
+    
+    // 🆕 Extrair dados do draft (dados parciais de checkout)
+    const draft = dados.draft || null;
+    const emailDraft = draft?.email || draft?.['pessoa-fisica']?.email || draft?.['pessoa-juridica']?.email || '';
+    const telefoneDraft = draft?.['pessoa-fisica']?.celular || draft?.['pessoa-fisica']?.telefone || draft?.['pessoa-juridica']?.celular || draft?.['pessoa-juridica']?.telefone || '';
+    const nomeDraft = draft?.['pessoa-fisica']?.['nome-completo'] || draft?.['pessoa-juridica']?.['razao-social'] || draft?.['pessoa-juridica']?.['nome-fantasia'] || '';
+    
+    // Priorizar dados: pessoaCarrinho > clienteAPI > draft > dados originais
+    const email = (
+      pessoaCarrinho?.email || 
+      clienteAPI?.email || 
+      emailDraft ||
+      dados.pessoaEmail || 
+      dados.email || 
+      ''
+    ).trim();
+    
+    const telefoneRaw = (
+      pessoaCarrinho?.contato_principal || 
+      clienteAPI?.telefone || 
+      telefoneDraft ||
+      dados.pessoaContato || 
+      dados.telefone || 
+      ''
+    ).trim();
+    
     const telefone = this.formatarTelefone(telefoneRaw);
-    const nome = (clienteAPI?.nome || dados.pessoaNome || dados.nome || 'Cliente').trim();
+    
+    const nome = (
+      pessoaCarrinho?.nome || 
+      clienteAPI?.nome || 
+      nomeDraft ||
+      dados.pessoaNome || 
+      dados.nome || 
+      'Cliente'
+    ).trim();
     
     console.log(`      📧 DEBUG pessoa extraída:`, JSON.stringify({ nome, email, telefone }));
     
@@ -115,6 +148,7 @@ class TransformerService {
         status: 'abandonado',
         status_codigo: 2,
         valor_total: carrinho.valor_total || carrinho.valorTotal || '0.00',
+        link_checkout: carrinho.linkCheckout || null,
         itens: this.transformarItens(carrinho.itens || [])
       },
       pedido: {
@@ -287,6 +321,35 @@ class TransformerService {
     if (carrinho.hash) {
       return `https://danajalecos.painel.magazord.com.br/carrinho/${carrinho.hash}`;
     }
+    return null;
+  }
+
+  /**
+   * Extrai link de checkout do carrinho
+   * Prioriza url_checkout que vem da API /carrinho/{id}/itens
+   */
+  extrairLinkCheckoutCarrinho(itensResponse) {
+    // O endpoint /carrinho/{id}/itens retorna: { carrinho: { url_checkout: "..." } }
+    return itensResponse?.carrinho?.url_checkout || null;
+  }
+
+  /**
+   * Extrai link de pagamento do objeto payment
+   * Retorna URL do boleto, QR Code do PIX ou null
+   */
+  extrairLinkPagamento(payment) {
+    if (!payment) return null;
+    
+    // Boleto - retorna URL
+    if (payment.boleto?.url) {
+      return payment.boleto.url;
+    }
+    
+    // PIX - retorna QR Code (Copia e Cola)
+    if (payment.pix?.qrCode) {
+      return payment.pix.qrCode;
+    }
+    
     return null;
   }
 }
