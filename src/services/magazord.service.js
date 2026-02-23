@@ -230,6 +230,24 @@ class MagazordService {
       return null;
     }
   }
+
+  /**
+   * Busca pedido completo por código (inclui itens e links)
+   * Endpoint: GET /v2/site/pedido/{codigoPedido}
+   */
+  async buscarPedidoCompleto(pedidoCodigo) {
+    try {
+      const response = await axios.get(
+        `${this.apiUrl}/v2/site/pedido/${pedidoCodigo}`,
+        { auth: this.auth }
+      );
+      
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(`Erro ao buscar pedido completo ${pedidoCodigo}:`, error.response?.data || error.message);
+      return null;
+    }
+  }
 }
 
 export default new MagazordService();

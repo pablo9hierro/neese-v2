@@ -224,6 +224,7 @@ class TransformerService {
         valor_total: pedido.valorTotal || pedido.valor_total || '0.00',
         forma_pagamento: pedido.formaPagamentoNome || pedido.formaPagamento || pedido.forma_pagamento || 'Não informado',
         link_pagamento: pedido.linkPagamento || pedido.link_pagamento || null,
+        link_checkout: pedido.linkCheckoutProduto || null, // Link do produto para pedidos expirados
         itens: this.transformarItens(pedido.itens || [])
       },
       origem: {
@@ -348,6 +349,35 @@ class TransformerService {
     // PIX - retorna QR Code (Copia e Cola)
     if (payment.pix?.qrCode) {
       return payment.pix.qrCode;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Extrai links dos produtos do pedido completo
+   * Usado para pedidos expirados onde carrinho está vazio
+   * @param {Object} pedidoCompleto - Pedido completo do endpoint /v2/site/pedido/{codigo}
+   * @returns {String|null} - Link COMPLETO do primeiro produto ou null
+   */
+  extrairLinksProdutosPedido(pedidoCompleto) {
+    if (!pedidoCompleto) return null;
+    
+    // Buscar itens em arrayPedidoRastreio[0].pedidoItem[]
+    const rastreios = pedidoCompleto.arrayPedidoRastreio || [];
+    if (rastreios.length === 0) return null;
+    
+    const itens = rastreios[0]?.pedidoItem || [];
+    if (itens.length === 0) return null;
+    
+    // Pegar URL da loja do pedido
+    const urlLoja = pedidoCompleto.lojaUrl || 'https://www.danajalecos.com.br';
+    
+    // Retornar link COMPLETO do primeiro produto (cliente pode adicionar no carrinho de novo)
+    const primeiroItem = itens[0];
+    if (primeiroItem?.linkProduto) {
+      const linkRelativo = primeiroItem.linkProduto.replace(/^\/+/, ''); // Remove / do início
+      return `${urlLoja}/${linkRelativo}`;
     }
     
     return null;

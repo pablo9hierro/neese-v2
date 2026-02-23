@@ -271,6 +271,7 @@ async function processarPedidos(dataInicio, dataFim) {
 
       // 🆕 BUSCAR PAGAMENTO (para obter link)
       let linkPagamento = null;
+      let linkCheckout = null;
       
       if (pedido.pedidoSituacao === 1 || pedido.pedidoSituacao === 2 || pedido.pedidoSituacao === 14) {
         console.log(`      💳 Buscando pagamento...`);
@@ -280,13 +281,25 @@ async function processarPedidos(dataInicio, dataFim) {
           linkPagamento = transformerService.extrairLinkPagamento(payment);
           console.log(`      ✅ Link pagamento: ${linkPagamento ? 'TEM' : 'NÃO TEM'}`);
         }
+        
+        // Para status 2 e 14 (expirados), buscar links dos produtos
+        if (!linkPagamento && (pedido.pedidoSituacao === 2 || pedido.pedidoSituacao === 14)) {
+          console.log(`      🔗 Buscando links dos produtos (pedido expirado)...`);
+          const pedidoDetalhado = await magazordService.buscarPedidoCompleto(pedido.codigo);
+          
+          if (pedidoDetalhado) {
+            linkCheckout = transformerService.extrairLinksProdutosPedido(pedidoDetalhado);
+            console.log(`      ✅ Link produto: ${linkCheckout ? linkCheckout : 'NÃO TEM'}`);
+          }
+        }
       }
 
       // Montar pedido completo
       const pedidoCompleto = {
         ...pedido,
         clienteAPI: cliente,
-        linkPagamento: linkPagamento
+        linkPagamento: linkPagamento,
+        linkCheckoutProduto: linkCheckout
       };
       
       console.log(`      🔄 Transformando pedido...`);

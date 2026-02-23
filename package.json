@@ -6,7 +6,11 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "limpar-banco": "node scripts/limpar-banco.js",
+    "test:pagamento": "node tests/test-buscar-pagamento.js",
+    "test:carrinho": "node tests/test-carrinho-hash.js",
+    "test:eventos": "node tests/test-eventos-completo.js"
   },
   "keywords": ["magazord", "gohighlevel", "webhook", "ecommerce"],
   "author": "",
